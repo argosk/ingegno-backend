@@ -1,0 +1,11 @@
+/ingegno-backend
+    ├── manage.py
+    ├── ingegno
+    │   ├── settings.py
+    │   ├── urls.py
+    ├── users/ (Gestione utenti, dal progetto Carouselly)
+    ├── campaigns/ (Gestione delle campagne)
+    ├── emails/ (Gestione invio email, warm-up)
+    ├── leads/ (Leads caricati dall'utente)
+    ├── tracking/ (Monitoraggio email aperte, clic, risposte)
+    └── requirements.txt

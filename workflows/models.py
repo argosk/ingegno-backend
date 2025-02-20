@@ -1,0 +1,70 @@
+import uuid
+from django.db import models
+from users.models import User
+
+
+class WorkflowStatus(models.TextChoices):
+    DRAFT = 'DRAFT'
+    PUBLISHED = 'PUBLISHED'
+
+
+class Workflow(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='workflows')
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True, null=True)
+    definition = models.JSONField(blank=True, null=True)
+    status = models.CharField(max_length=50, choices=WorkflowStatus.choices, default=WorkflowStatus.DRAFT)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ['user', 'name']
+
+    def __str__(self):
+        return self.name
+    
+
+class WorkflowExecutionStatus(models.TextChoices):
+    PENDING = 'PENDING'
+    RUNNING = 'RUNNING'
+    COMPLETED = 'COMPLETED'
+    FAILED = 'FAILED'
+
+
+class WorkflowExecution(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    workflow = models.ForeignKey(Workflow, on_delete=models.CASCADE, related_name='executions')
+    trigger = models.CharField(max_length=50)
+    status = models.CharField(max_length=50, choices=WorkflowExecutionStatus.choices, default=WorkflowExecutionStatus.PENDING)
+    created_at = models.DateTimeField(auto_now_add=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.workflow.name} - {self.status}"
+    
+
+class WorkflowExecutionStepStatus(models.TextChoices):
+    CREATED = 'CREATED'
+    PENDING = 'PENDING'
+    RUNNING = 'RUNNING'
+    COMPLETED = 'COMPLETED'
+    FAILED = 'FAILED'
+
+
+class WorkflowExecutionStep(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    workflow_execution = models.ForeignKey(WorkflowExecution, on_delete=models.CASCADE, related_name='steps')
+    status = models.CharField(max_length=50, choices=WorkflowExecutionStepStatus.choices, default=WorkflowExecutionStepStatus.CREATED)
+    number = models.IntegerField()
+    node = models.JSONField()
+    name = models.CharField(max_length=50)
+    started_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    # inputs = models.CharField(max_length=255, null=True, blank=True)
+    # outputs = models.CharField(max_length=255, null=True, blank=True)
+    credits_consumed = models.IntegerField(null=True, blank=True)
+
+    def __str__(self):
+        return f"Step {self.number} - {self.name} ({self.status})"
