@@ -8,6 +8,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from google_auth_oauthlib.flow import Flow
+
+from utils.pagination import CustomPageNumberPagination
 from .utils import discover_email_servers, encrypt_password, decrypt_password
 from .models import ConnectedAccount
 from .serializers import ConnectedAccountSerializer
@@ -17,6 +19,7 @@ class ConnectedAccountViewSet(viewsets.ModelViewSet):
     queryset = ConnectedAccount.objects.all()
     serializer_class = ConnectedAccountSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = CustomPageNumberPagination
 
     def get_queryset(self):
         # Visualizza solo gli account associati all'utente corrente

@@ -33,11 +33,11 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 class CustomTokenRefreshView(TokenRefreshView):
     def post(self, request, *args, **kwargs):
         
-        print("Tutti i cookie ricevuti:", request.COOKIES)  # Verifica cosa arriva
+        # print("Tutti i cookie ricevuti:", request.COOKIES)  # Verifica cosa arriva
 
         # Ottieni il token di refresh dal cookie
         refresh_token = request.COOKIES.get("auth-refresh-token")
-        print('refresh_token', refresh_token) # è nullo!!!
+        # print('refresh_token', refresh_token) # è nullo!!!
         
         if not refresh_token:
             return Response({"detail": "Refresh token is missing or invalid."}, status=400)

@@ -1,5 +1,6 @@
 import uuid
 from django.db import models
+from campaigns.models import Campaign
 from users.models import User
 
 
@@ -10,9 +11,10 @@ class WorkflowStatus(models.TextChoices):
 
 class Workflow(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    campaign = models.OneToOneField(Campaign, on_delete=models.CASCADE)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='workflows')
     name = models.CharField(max_length=255)
-    description = models.TextField(blank=True, null=True)
+    description = models.CharField(max_length=255, blank=True, null=True)
     definition = models.JSONField(blank=True, null=True)
     status = models.CharField(max_length=50, choices=WorkflowStatus.choices, default=WorkflowStatus.DRAFT)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -35,7 +37,7 @@ class WorkflowExecutionStatus(models.TextChoices):
 class WorkflowExecution(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     workflow = models.ForeignKey(Workflow, on_delete=models.CASCADE, related_name='executions')
-    trigger = models.CharField(max_length=50)
+    trigger = models.CharField(max_length=50) # Manuale, programmato, evento cronjob, webhook, ecc.
     status = models.CharField(max_length=50, choices=WorkflowExecutionStatus.choices, default=WorkflowExecutionStatus.PENDING)
     created_at = models.DateTimeField(auto_now_add=True)
     started_at = models.DateTimeField(null=True, blank=True)
@@ -57,13 +59,13 @@ class WorkflowExecutionStep(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     workflow_execution = models.ForeignKey(WorkflowExecution, on_delete=models.CASCADE, related_name='steps')
     status = models.CharField(max_length=50, choices=WorkflowExecutionStepStatus.choices, default=WorkflowExecutionStepStatus.CREATED)
+    parent_node_id = models.UUIDField(null=True, blank=True)
     number = models.IntegerField()
     node = models.JSONField()
     name = models.CharField(max_length=50)
+    condition = models.CharField(max_length=50, blank=True, null=True)
     started_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
-    # inputs = models.CharField(max_length=255, null=True, blank=True)
-    # outputs = models.CharField(max_length=255, null=True, blank=True)
     credits_consumed = models.IntegerField(null=True, blank=True)
 
     def __str__(self):

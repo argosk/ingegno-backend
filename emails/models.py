@@ -1,31 +1,19 @@
 from django.db import models
-
-from users.models import User
-from campaigns.models import EmailSequence
-
-# Create your models here.
-from django.db import models
 from leads.models import Lead
-from campaigns.models import EmailSequence
 
+class EmailStatus(models.TextChoices):
+    SENT = "sent", "Sent"
+    OPENED = "opened", "Opened"
+    REPLIED = "replied", "Replied"
+    BOUNCED = "bounced", "Bounced"
 
-class Email(models.Model):
-    sequence = models.ForeignKey(EmailSequence, on_delete=models.CASCADE)
-    lead = models.ForeignKey(Lead, on_delete=models.CASCADE, related_name='emails')  # Aggiunto related_name
-    sender_email = models.EmailField()
-    status = models.CharField(max_length=20, choices=[('pending', 'Pending'), ('sent', 'Sent'), ('failed', 'Failed')])
-    sent_at = models.DateTimeField(null=True, blank=True)
+class EmailLog(models.Model):
+    lead = models.ForeignKey(Lead, on_delete=models.CASCADE, related_name="emails")
+    subject = models.CharField(max_length=255)
+    body = models.TextField()
+    sent_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=50, choices=EmailStatus.choices, default=EmailStatus.SENT)
+    response_received = models.BooleanField(default=False)
 
-    def get_recipient_email(self):
-        # Retrieve the email directly from the associated lead
-        return self.lead.email
-
-
-class WarmUpTask(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    email_account = models.EmailField()  # Account connesso (Gmail/Outlook)
-    start_date = models.DateTimeField()
-    daily_limit = models.PositiveIntegerField(default=10)  # Numero giornaliero iniziale
-    increase_rate = models.PositiveIntegerField(default=5)  # Incremento giornaliero
-    max_limit = models.PositiveIntegerField(default=100)  # Limite massimo
-    is_active = models.BooleanField(default=False)
+    def __str__(self):
+        return f"Email to {self.lead.email} - {self.get_status_display()}"

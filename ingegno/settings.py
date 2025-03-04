@@ -48,12 +48,12 @@ INSTALLED_APPS = [
     'users',
     'connected_accounts',
     'subscriptions',
-    'leads',   
     'campaigns',
+    'leads',   
     'emails',
-    'tracking', 
+    # 'tracking', 
     'workflows',
-    'blog',
+    # 'blog',
 ]
 
 MIDDLEWARE = [
@@ -167,7 +167,7 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=1),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=20),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
     'ROTATE_REFRESH_TOKENS': False,
     'BLACKLIST_AFTER_ROTATION': True,
@@ -210,6 +210,12 @@ STRIPE_WEBHOOK_SECRET = env.str('STRIPE_WEBHOOK_SECRET', default='')
 FRONTEND_URL = env.str('FRONTEND_URL', default='')
 
 OPENAI_API_KEY = env.str('OPENAI_API_KEY', default='')
+
+CELERY_BROKER_URL = env.str("CELERY_BROKER_URL", "redis://localhost:6379/0")
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+
 
 OAUTH2_PROVIDERS = {
     'gmail': {

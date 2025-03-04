@@ -1,11 +1,9 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import EmailViewSet, WarmUpTaskViewSet
+from emails.views import EmailLogViewSet
 
-# Crea un router per registrare gli endpoint
 router = DefaultRouter()
-router.register(r'emails', EmailViewSet)
-router.register(r'warmup-tasks', WarmUpTaskViewSet)
+router.register(r'email-logs', EmailLogViewSet, basename="email-logs")
 
 urlpatterns = [
     path('', include(router.urls)),

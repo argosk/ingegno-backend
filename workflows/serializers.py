@@ -1,17 +1,32 @@
 from rest_framework import serializers
+
+from campaigns.models import Campaign
 from .models import Workflow, WorkflowExecution, WorkflowExecutionStep
 
 
+# class WorkflowSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = Workflow
+#         fields = ['id', 'name', 'description', 'definition', 'status', 'created_at', 'updated_at']
+
 class WorkflowSerializer(serializers.ModelSerializer):
+    campaign = serializers.PrimaryKeyRelatedField(queryset=Campaign.objects.all())
+
     class Meta:
         model = Workflow
-        fields = ['id', 'name', 'description', 'definition', 'status', 'created_at', 'updated_at']
+        fields = ['id', 'campaign', 'name', 'description', 'definition', 'status', 'created_at', 'updated_at']
 
+    def validate_campaign(self, value):
+        """ Assicurati che la campagna appartenga all'utente autenticato. """
+        request = self.context.get('request')
+        if value.user != request.user:
+            raise serializers.ValidationError("Non puoi associare un workflow a una campagna che non ti appartiene.")
+        return value
 
 class WorkflowExecutionStepSerializer(serializers.ModelSerializer):
     class Meta:
         model = WorkflowExecutionStep
-        fields = ['id', 'number', 'node', 'name', 'status', 'started_at', 'completed_at', 'credits_consumed']
+        fields = ['id', 'number', 'node', 'name', 'status', 'started_at', 'completed_at', 'credits_consumed', 'parent_node_id', 'condition']
         read_only_fields = ['id']
 
 
