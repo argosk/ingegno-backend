@@ -27,10 +27,10 @@ def process_csv_leads(self, file_data, campaign_id, user_id):
     processed_count = 0
 
     for row in csv_reader:
-        status_value = row.get('status', LeadStatus.NEW).strip().lower()
-        if status_value not in dict(LeadStatus.choices):
-            errors.append(f"Invalid status '{status_value}' for lead {row.get('email')}")
-            continue
+        # status_value = row.get('status', LeadStatus.NEW).strip().lower()
+        # if status_value not in dict(LeadStatus.choices):
+        #     errors.append(f"Invalid status '{status_value}' for lead {row.get('email')}")
+        #     continue
 
         lead = Lead(
             campaign=campaign,
@@ -38,8 +38,6 @@ def process_csv_leads(self, file_data, campaign_id, user_id):
             email=row.get('email', '').strip(),
             phone=row.get('phone', '').strip() if 'phone' in row else None,
             company=row.get('company', '').strip() if 'company' in row else None,
-            source=row.get('source', '').strip(),
-            status=status_value
         )
         leads.append(lead)
         processed_count += 1

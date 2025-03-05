@@ -4,6 +4,7 @@ from leads.models import Lead
 class EmailStatus(models.TextChoices):
     SENT = "sent", "Sent"
     OPENED = "opened", "Opened"
+    CLICKED = "clicked", "Clicked"
     REPLIED = "replied", "Replied"
     BOUNCED = "bounced", "Bounced"
 
@@ -17,3 +18,12 @@ class EmailLog(models.Model):
 
     def __str__(self):
         return f"Email to {self.lead.email} - {self.get_status_display()}"
+
+
+class ClickLog(models.Model):
+    email_log = models.ForeignKey(EmailLog, on_delete=models.CASCADE, related_name="clicks")
+    link = models.URLField()
+    clicked_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Click on {self.link} by {self.email_log.lead.email}"

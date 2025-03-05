@@ -1,6 +1,7 @@
 import uuid
 from django.db import models
 from campaigns.models import Campaign
+from emails.models import EmailLog
 from users.models import User
 
 
@@ -67,6 +68,8 @@ class WorkflowExecutionStep(models.Model):
     started_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     credits_consumed = models.IntegerField(null=True, blank=True)
+    email_log = models.ForeignKey(EmailLog, null=True, blank=True, on_delete=models.SET_NULL)
+
 
     def __str__(self):
         return f"Step {self.number} - {self.name} ({self.status})"

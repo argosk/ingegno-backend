@@ -76,22 +76,22 @@ class LeadViewSet(viewsets.ModelViewSet):
 
         return Response({"message": f"{deleted_count} leads deleted successfully."}, status=status.HTTP_200_OK)
     
-    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
-    def update_status(self, request, pk=None):
-        """
-        Custom endpoint to update the lead's status.
-        """
-        lead = self.get_object()
-        new_status = request.data.get('status')
+    # @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    # def update_status(self, request, pk=None):
+    #     """
+    #     Custom endpoint to update the lead's status.
+    #     """
+    #     lead = self.get_object()
+    #     new_status = request.data.get('status')
 
-        if new_status not in dict(lead._meta.get_field('status').choices):
-            # return Response({'error': 'Invalid status.'}, status=status.HTTP_400_BAD_REQUEST)
-            raise serializers.ValidationError({'error': 'Invalid status.'}, code=status.HTTP_400_BAD_REQUEST)
+    #     if new_status not in dict(lead._meta.get_field('status').choices):
+    #         # return Response({'error': 'Invalid status.'}, status=status.HTTP_400_BAD_REQUEST)
+    #         raise serializers.ValidationError({'error': 'Invalid status.'}, code=status.HTTP_400_BAD_REQUEST)
 
-        lead.status = new_status
-        lead.save()
+    #     lead.status = new_status
+    #     lead.save()
 
-        return Response({'message': 'Status updated successfully', 'new_status': lead.get_status_display()})
+    #     return Response({'message': 'Status updated successfully', 'new_status': lead.get_status_display()})
 
 
     @action(detail=False, methods=['get'], url_path='campaign-stats', permission_classes=[permissions.IsAuthenticated])
@@ -129,7 +129,7 @@ class LeadViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'], url_path='upload-csv', permission_classes=[permissions.IsAuthenticated])
     def upload_csv(self, request):
         file = request.FILES.get('file')
-        campaign_id = request.data.get('campaign_id')
+        campaign_id = request.data.get('campaign')
 
         if not file or not campaign_id:
             # return Response({'error': "File or campaign_id missing."}, status=status.HTTP_400_BAD_REQUEST)

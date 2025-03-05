@@ -2,6 +2,8 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+
+from workflows.tasks import execute_workflow_task
 from .models import Workflow, WorkflowExecution, WorkflowExecutionStep
 from .serializers import WorkflowExecutionWithStepsSerializer, WorkflowExecutionSerializer, WorkflowSerializer, WorkflowExecutionStepSerializer
 
@@ -62,6 +64,10 @@ class WorkflowExecutionViewSet(viewsets.ModelViewSet):
 
             # Ora crea una nuova esecuzione e gli step associati
             workflow_execution = serializer.save()
+
+            # 🔹 Avvia il task Celery in background
+            execute_workflow_task.delay(workflow_execution.id)  
+
             return Response(WorkflowExecutionWithStepsSerializer(workflow_execution).data, status=status.HTTP_201_CREATED)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
