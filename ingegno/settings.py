@@ -96,11 +96,14 @@ DEVELOPMENT_MODE = os.getenv('DEVELOPMENT_MODE') == 'True'
 DEVELOPMENT_MODE = env.bool("DEVELOPMENT_MODE", False)
 
 if DEVELOPMENT_MODE is True:
+    # DATABASES = {
+    #     'default': {
+    #         'ENGINE': 'django.db.backends.sqlite3',
+    #         'NAME': BASE_DIR / 'db.sqlite3',
+    #     }
+    # }
     DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
-        }
+        "default": dj_database_url.parse(env.str("DATABASE_URL_DEV")),
     }
 elif len(sys.argv) > 0 and sys.argv[1] != 'collectstatic':
     if env.str("DATABASE_URL", None) is None:

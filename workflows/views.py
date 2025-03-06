@@ -59,14 +59,16 @@ class WorkflowExecutionViewSet(viewsets.ModelViewSet):
             except Workflow.DoesNotExist:
                 return Response({"error": "Workflow not found"}, status=status.HTTP_404_NOT_FOUND)
 
-            # Elimina tutte le esecuzioni precedenti collegate al workflow e i relativi step
+            # ELIMINIAMO TUTTE LE ESECUZIONI PRECEDENTI
             WorkflowExecution.objects.filter(workflow=workflow).delete()
-
-            # Ora crea una nuova esecuzione e gli step associati
+            print("@DEBUG: ❌ Eliminati tutti i workflow precedenti")
+        
+            # CREIAMO UNA NUOVA ESECUZIONE
             workflow_execution = serializer.save()
+            print("@DEBUG: 🆕 Creato nuovo workflow_execution:", workflow_execution.id)
 
-            # 🔹 Avvia il task Celery in background
-            execute_workflow_task.delay(workflow_execution.id)  
+            # AVVIAMO IL TASK CELERY (ora lavora su dati nuovi)
+            execute_workflow_task.delay(workflow_execution.id)
 
             return Response(WorkflowExecutionWithStepsSerializer(workflow_execution).data, status=status.HTTP_201_CREATED)
         

@@ -43,6 +43,7 @@ class WorkflowExecution(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     started_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
+    is_obsolete = models.BooleanField(default=False)  # Campo per contrassegnare esecuzioni vecchie
 
     def __str__(self):
         return f"{self.workflow.name} - {self.status}"
@@ -69,7 +70,6 @@ class WorkflowExecutionStep(models.Model):
     completed_at = models.DateTimeField(null=True, blank=True)
     credits_consumed = models.IntegerField(null=True, blank=True)
     email_log = models.ForeignKey(EmailLog, null=True, blank=True, on_delete=models.SET_NULL)
-
 
     def __str__(self):
         return f"Step {self.number} - {self.name} ({self.status})"

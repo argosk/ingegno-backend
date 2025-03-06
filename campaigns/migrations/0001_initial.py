@@ -3,6 +3,7 @@
 from django.conf import settings
 from django.db import migrations, models
 import django.db.models.deletion
+import uuid
 
 
 class Migration(migrations.Migration):
@@ -17,7 +18,7 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='Campaign',
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False, verbose_name='ID')),
                 ('name', models.CharField(max_length=255)),
                 ('start_date', models.DateTimeField(blank=True, null=True)),
                 ('is_active', models.BooleanField(default=True)),
