@@ -6,5 +6,5 @@ class EmailLogSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = EmailLog
-        fields = ['id', 'lead', 'lead_email', 'subject', 'body', 'sent_at', 'status', 'response_received']
+        fields = ['id', 'lead', 'lead_email', 'subject', 'body', 'sent_at', 'status', 'response_received', 'sender']
         read_only_fields = ['id', 'sent_at']

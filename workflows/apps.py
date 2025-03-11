@@ -10,5 +10,5 @@ class WorkflowsConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "workflows"
 
-    def ready(self):
-        import workflows.signals  # ✅ Importa i segnali quando l'app è pronta
+    # def ready(self):
+    #     import workflows.signals  # ✅ Importa i segnali quando l'app è pronta

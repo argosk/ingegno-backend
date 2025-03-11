@@ -3,7 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 
-from workflows.tasks import execute_workflow_task
+from workflows.tasks import execute_workflow
 from .models import Workflow, WorkflowExecution, WorkflowExecutionStep
 from .serializers import WorkflowExecutionWithStepsSerializer, WorkflowExecutionSerializer, WorkflowSerializer, WorkflowExecutionStepSerializer
 
@@ -68,7 +68,9 @@ class WorkflowExecutionViewSet(viewsets.ModelViewSet):
             print("@DEBUG: 🆕 Creato nuovo workflow_execution:", workflow_execution.id)
 
             # AVVIAMO IL TASK CELERY (ora lavora su dati nuovi)
-            execute_workflow_task.delay(workflow_execution.id)
+            execute_workflow.delay(workflow_execution.id, 1)
+            # execute_workflow.delay(workflow_execution.id)
+            # run_workflow.delay(workflow_execution.id)
 
             return Response(WorkflowExecutionWithStepsSerializer(workflow_execution).data, status=status.HTTP_201_CREATED)
         

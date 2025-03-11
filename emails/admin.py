@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import EmailLog, ClickLog
+from .models import EmailLog, EmailClickTracking
 
 admin.site.register(EmailLog)
-admin.site.register(ClickLog)
+admin.site.register(EmailClickTracking)

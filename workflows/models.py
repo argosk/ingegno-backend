@@ -58,7 +58,7 @@ class WorkflowExecutionStepStatus(models.TextChoices):
 
 
 class WorkflowExecutionStep(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    id = models.UUIDField(primary_key=True, editable=False)
     workflow_execution = models.ForeignKey(WorkflowExecution, on_delete=models.CASCADE, related_name='steps')
     status = models.CharField(max_length=50, choices=WorkflowExecutionStepStatus.choices, default=WorkflowExecutionStepStatus.CREATED)
     parent_node_id = models.UUIDField(null=True, blank=True)

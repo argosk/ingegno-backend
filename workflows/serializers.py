@@ -1,3 +1,4 @@
+import json
 from rest_framework import serializers
 
 from campaigns.models import Campaign
@@ -27,7 +28,7 @@ class WorkflowExecutionStepSerializer(serializers.ModelSerializer):
     class Meta:
         model = WorkflowExecutionStep
         fields = ['id', 'number', 'node', 'name', 'status', 'started_at', 'completed_at', 'credits_consumed', 'parent_node_id', 'condition']
-        read_only_fields = ['id']
+        # read_only_fields = ['id']
 
 
 class WorkflowExecutionWithStepsSerializer(serializers.ModelSerializer):
@@ -45,8 +46,12 @@ class WorkflowExecutionWithStepsSerializer(serializers.ModelSerializer):
         
         # Crea i WorkflowExecutionStep collegati al WorkflowExecution appena creato
         for step_data in steps_data:
+            node_data = json.loads(step_data.get('node'))
+            id = node_data.get('id')
+            # print(step_data.get('node'))
             WorkflowExecutionStep.objects.create(
                 workflow_execution=workflow_execution,
+                id=id,
                 **step_data
             )
         
