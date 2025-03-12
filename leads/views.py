@@ -1,15 +1,17 @@
 from django.core.cache import cache
+from django.db.models import Count
+from django.utils.timezone import now, timedelta
+from django.db.models import Q
 from rest_framework import viewsets, permissions, status, serializers
 from rest_framework.response import Response
 from rest_framework.decorators import action
+from django_filters.rest_framework import DjangoFilterBackend
 from .models import Lead, LeadStatus
 from .serializers import LeadSerializer
 from campaigns.models import Campaign
 from campaigns.pagination import CustomPageNumberPagination
-from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
-from django.db.models import Q
-from emails.models import EmailLog, EmailReplyTracking, EmailStatus
+from emails.models import EmailLog, EmailReplyTracking, EmailOpenTracking, EmailStatus
 from .tasks import process_csv_leads
 
 
@@ -126,6 +128,55 @@ class LeadViewSet(viewsets.ModelViewSet):
             "replied": replied_emails
         })
 
+    @action(detail=False, methods=['get'], url_path='campaign-analytics')
+    def campaign_analytics(self, request):
+        """
+        Returns analytics data for a campaign, including contacted, opened, and replied emails.
+        """
+        campaign_id = request.query_params.get('campaign_id')
+        period = request.query_params.get('period', '90')  # Default: Last 3 months
+
+        if not campaign_id:
+            raise serializers.ValidationError({'error': "Missing 'campaign_id' parameter."})
+
+        user = request.user
+        try:
+            campaign = Campaign.objects.get(id=campaign_id, user=user)
+        except Campaign.DoesNotExist:
+            raise serializers.ValidationError({'error': "Campaign not found or not authorized."})
+
+        # Determina l'intervallo di date
+        period_days = int(period)
+        start_date = now() - timedelta(days=period_days)
+
+        # Aggrega i dati per giorno
+        contacted = Lead.objects.filter(campaign=campaign, status=LeadStatus.CONTACTED, created_at__gte=start_date) \
+            .extra({'date': "date(created_at)"}).values('date') \
+            .annotate(count=Count('id')).order_by('date')
+
+        opened = EmailOpenTracking.objects.filter(lead__campaign=campaign, opened_at__gte=start_date) \
+            .extra({'date': "date(opened_at)"}).values('date') \
+            .annotate(count=Count('id')).order_by('date')
+
+        replied = EmailReplyTracking.objects.filter(lead__campaign=campaign, received_at__gte=start_date) \
+            .extra({'date': "date(received_at)"}).values('date') \
+            .annotate(count=Count('id')).order_by('date')
+
+        # Formatta i dati per il frontend
+        analytics_data = []
+        all_dates = set([entry['date'] for entry in contacted] + 
+                        [entry['date'] for entry in opened] + 
+                        [entry['date'] for entry in replied])
+
+        for date in sorted(all_dates):
+            analytics_data.append({
+                "date": date,
+                "contacted": next((c['count'] for c in contacted if c['date'] == date), 0),
+                "opened": next((o['count'] for o in opened if o['date'] == date), 0),
+                "replied": next((r['count'] for r in replied if r['date'] == date), 0)
+            })
+
+        return Response(analytics_data)
 
     @action(detail=False, methods=['post'], url_path='upload-csv', permission_classes=[permissions.IsAuthenticated])
     def upload_csv(self, request):
