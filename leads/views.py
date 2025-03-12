@@ -15,7 +15,6 @@ from emails.models import EmailLog, EmailReplyTracking, EmailOpenTracking, Email
 from .tasks import process_csv_leads
 
 
-
 class LeadViewSet(viewsets.ModelViewSet):
     queryset = Lead.objects.all()
     serializer_class = LeadSerializer
@@ -131,7 +130,7 @@ class LeadViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], url_path='campaign-analytics')
     def campaign_analytics(self, request):
         """
-        Returns analytics data for a campaign, including contacted, opened, and replied emails.
+        Returns analytics data for a campaign, ensuring all days in the requested period are included.
         """
         campaign_id = request.query_params.get('campaign_id')
         period = request.query_params.get('period', '90')  # Default: Last 3 months
@@ -147,36 +146,43 @@ class LeadViewSet(viewsets.ModelViewSet):
 
         # Determina l'intervallo di date
         period_days = int(period)
-        start_date = now() - timedelta(days=period_days)
+        start_date = (now() - timedelta(days=period_days)).date()
+        end_date = now().date()
+
+        # Generiamo tutte le date del periodo
+        date_range = [(start_date + timedelta(days=i)).isoformat() for i in range((end_date - start_date).days + 1)]
+        
+        # Creiamo un dizionario con tutte le date inizializzate a zero
+        analytics_data = {date: {"date": date, "contacted": 0, "opened": 0, "replied": 0} for date in date_range}
 
         # Aggrega i dati per giorno
-        contacted = Lead.objects.filter(campaign=campaign, status=LeadStatus.CONTACTED, created_at__gte=start_date) \
-            .extra({'date': "date(created_at)"}).values('date') \
-            .annotate(count=Count('id')).order_by('date')
+        contacted = Lead.objects.filter(campaign=campaign, status=LeadStatus.CONTACTED, created_at__date__gte=start_date) \
+            .values('created_at__date') \
+            .annotate(count=Count('id'))
+        
+        opened = EmailOpenTracking.objects.filter(lead__campaign=campaign, opened_at__date__gte=start_date) \
+            .values('opened_at__date') \
+            .annotate(count=Count('id'))
+        
+        replied = EmailReplyTracking.objects.filter(lead__campaign=campaign, received_at__date__gte=start_date) \
+            .values('received_at__date') \
+            .annotate(count=Count('id'))
 
-        opened = EmailOpenTracking.objects.filter(lead__campaign=campaign, opened_at__gte=start_date) \
-            .extra({'date': "date(opened_at)"}).values('date') \
-            .annotate(count=Count('id')).order_by('date')
+        # Inseriamo i valori nei dati già inizializzati
+        for entry in contacted:
+            date_str = entry['created_at__date'].isoformat()
+            analytics_data[date_str]['contacted'] = entry['count']
+        
+        for entry in opened:
+            date_str = entry['opened_at__date'].isoformat()
+            analytics_data[date_str]['opened'] = entry['count']
+        
+        for entry in replied:
+            date_str = entry['received_at__date'].isoformat()
+            analytics_data[date_str]['replied'] = entry['count']
 
-        replied = EmailReplyTracking.objects.filter(lead__campaign=campaign, received_at__gte=start_date) \
-            .extra({'date': "date(received_at)"}).values('date') \
-            .annotate(count=Count('id')).order_by('date')
-
-        # Formatta i dati per il frontend
-        analytics_data = []
-        all_dates = set([entry['date'] for entry in contacted] + 
-                        [entry['date'] for entry in opened] + 
-                        [entry['date'] for entry in replied])
-
-        for date in sorted(all_dates):
-            analytics_data.append({
-                "date": date,
-                "contacted": next((c['count'] for c in contacted if c['date'] == date), 0),
-                "opened": next((o['count'] for o in opened if o['date'] == date), 0),
-                "replied": next((r['count'] for r in replied if r['date'] == date), 0)
-            })
-
-        return Response(analytics_data)
+        # Convertiamo il dizionario in lista ordinata
+        return Response(list(analytics_data.values()))    
 
     @action(detail=False, methods=['post'], url_path='upload-csv', permission_classes=[permissions.IsAuthenticated])
     def upload_csv(self, request):
