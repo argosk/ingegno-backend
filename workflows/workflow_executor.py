@@ -1,9 +1,17 @@
 import json
 import time
-from emails.models import EmailClickTracking, EmailLog, EmailOpenTracking
-from leads.models import Lead
+from connected_accounts.models import ConnectedAccount, Provider
+from emails.models import EmailClickTracking, EmailLog, EmailOpenTracking, EmailReplyTracking
+from leads.models import Lead, LeadStatus
+from workflows.email_sender import send_email_gmail, send_email_outlook, send_email_smtp
 from workflows.models import WorkflowExecutionStep, WorkflowExecutionStepStatus
 from django.utils.timezone import now
+
+def get_connected_account(email_address):
+    """
+    Recupera l'account connesso corrispondente all'indirizzo email fornito.
+    """
+    return ConnectedAccount.objects.filter(email_address=email_address, is_active=True).first()
 
 
 def find_previous_email_log(current_step):
@@ -23,6 +31,11 @@ def execute_step(step, lead_id):
     Esegue un nodo del workflow in base al suo tipo e al lead.
     """
     try:
+        # Controlliamo se il lead ha risposto a un'email del workflow
+        if EmailReplyTracking.objects.filter(lead_id=lead_id).exists():
+            print(f"Lead {lead_id} has replied to an email. Stopping execution for this lead.")
+            return  # Non eseguiamo il nodo
+                
         step.status = WorkflowExecutionStepStatus.RUNNING
         step.started_at = now()
         step.save()
@@ -49,11 +62,26 @@ def execute_step(step, lead_id):
             # tracking_pixel_url = f"https://yourdomain.com{reverse('track_email_open', args=[lead.id])}"
             # body += f'<img src="{tracking_pixel_url}" width="1" height="1" style="display:none;" />'
 
-            print(f"Sending email to {lead.email}: {subject} - {body}")
-
             # Simuliamo l'invio della mail (sostituire con send_mail in produzione)
             # send_mail(subject, body, email_account, [lead.email])
-            time.sleep(5)  # Simuliamo l'invio
+            # time.sleep(5)  # Simuliamo l'invio
+
+                        # Recuperiamo l'account email connesso
+            connected_account = get_connected_account(email_account)
+            if not connected_account:
+                print(f"No connected email account found for {email_account}. Skipping SEND_EMAIL.")
+                step.status = WorkflowExecutionStepStatus.FAILED
+                step.save()
+                return
+
+            print(f"Sending email from {connected_account.provider} ({email_account}) to {lead.email}: {subject}")
+
+            if connected_account.provider == Provider.GMAIL:
+                send_email_gmail(connected_account, lead.email, subject, body)
+            elif connected_account.provider == Provider.OUTLOOK:
+                send_email_outlook(connected_account, lead.email, subject, body)
+            else:
+                send_email_smtp(connected_account, lead.email, subject, body)
 
             # Registriamo l'invio nel log
             email_log = EmailLog.objects.create(
@@ -62,6 +90,10 @@ def execute_step(step, lead_id):
                 body=body,
                 sender=email_account
             )
+
+            # Segniamo il lead come contattato
+            lead.status = LeadStatus.CONTACTED
+            lead.save()
 
             # Salviamo il riferimento all'email log nel nodo del workflow
             step.email_log = email_log
@@ -112,52 +144,3 @@ def execute_step(step, lead_id):
         step.status = WorkflowExecutionStepStatus.FAILED
         step.save()
         print(f"Step execution failed: {e}")
-        
-# def execute_step(step):
-#     """
-#     Esegue un nodo del workflow in base al suo tipo e imposta le condizioni.
-#     """
-#     try:
-#         step.status = WorkflowExecutionStepStatus.RUNNING
-#         step.started_at = now()
-#         step.save()
-
-#         node_data = step.node
-#         if isinstance(node_data, str):
-#             node_data = json.loads(node_data)
-
-#         if node_data["type"] == "WAIT":
-#             delay_hours = node_data["data"]["settings"]["delay_hours"]
-#             print(f"Waiting for {delay_hours} hours...")
-#             # time.sleep(delay_hours * 3600)  # Bloccante, ma viene eseguito dentro Celery
-#             time.sleep(5)  # Simuliamo l'attesa
-
-#         elif node_data["type"] == "SEND_EMAIL":
-#             subject = node_data["data"]["settings"]["subject"]
-#             body = node_data["data"]["settings"]["body"]
-#             email_account = node_data["data"]["settings"]["email_account"]
-#             print(f"Sending email: {subject} - {body} from {email_account}")
-
-#         elif node_data["type"] == "CHECK_LINK_CLICKED":
-#             email_id = node_data["data"]["settings"]["email_id"]
-#             link_url = node_data["data"]["settings"]["link_url"]
-#             print(f"Checking if {link_url} was clicked in email {email_id}")
-
-#             # Simuliamo un controllo reale (dovrebbe essere gestito dal database o da un log)
-#             link_clicked = True  # Se il link è stato cliccato, mettiamo True
-
-#             if link_clicked:
-#                 step.condition = "YES"
-#             else:
-#                 step.condition = "NO"
-
-#             step.save()
-
-#         step.status = WorkflowExecutionStepStatus.COMPLETED
-#         step.completed_at = now()
-#         step.save()
-
-#     except Exception as e:
-#         step.status = WorkflowExecutionStepStatus.FAILED
-#         step.save()
-#         print(f"Step execution failed: {e}")

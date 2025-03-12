@@ -9,7 +9,7 @@ from campaigns.pagination import CustomPageNumberPagination
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django.db.models import Q
-from emails.models import EmailLog, EmailStatus
+from emails.models import EmailLog, EmailReplyTracking, EmailStatus
 from .tasks import process_csv_leads
 
 
@@ -116,7 +116,8 @@ class LeadViewSet(viewsets.ModelViewSet):
         contacted_leads = Lead.objects.filter(campaign=campaign, status=LeadStatus.CONTACTED).count()
 
         opened_emails = EmailLog.objects.filter(lead__campaign=campaign, status=EmailStatus.OPENED).count()
-        replied_emails = EmailLog.objects.filter(lead__campaign=campaign, response_received=True).count()
+        # replied_emails = EmailLog.objects.filter(lead__campaign=campaign, response_received=True).count()
+        replied_emails = EmailReplyTracking.objects.filter(lead__campaign=campaign).count()
 
         return Response({
             "leads": total_leads,
