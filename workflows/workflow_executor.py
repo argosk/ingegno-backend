@@ -114,7 +114,11 @@ def execute_step(step, lead_id):
                 return
 
             # Controlliamo se il lead ha cliccato su un link nell'email specifica
-            clicked = EmailClickTracking.objects.filter(lead=lead, email_log=email_log, clicked=True).exists()
+            # clicked = EmailClickTracking.objects.filter(lead=lead, email_log=email_log, clicked=True).exists()
+            link_url = node_data["data"]["settings"]["link_url"]
+
+            # Controllo se il lead ha cliccato su un link specifico
+            clicked = clicked.filter(lead=lead, email_log=email_log, link=link_url, clicked=True).exists()
 
             if clicked:
                 step.condition = "YES"
