@@ -48,10 +48,19 @@ def execute_step(step, lead_id):
         lead = Lead.objects.get(id=lead_id)
 
         if node_data["type"] == "WAIT":
-            delay_hours = node_data["data"]["settings"]["delay_hours"]
-            print(f"Waiting for {delay_hours} hours...")
+            delay = node_data["data"]["settings"]["delay"]
+            format = node_data["data"]["settings"]["format"]
+            print(f"Waiting for {delay} {format}")
             # time.sleep(delay_hours * 3600)
-            time.sleep(5)  # Simuliamo l'attesa
+            if format == "Minutes":
+                # TODO: Rimuovere il time.sleep e implementare con Celery (?) - da testare workflow con almeno 2 utenti
+                time.sleep(delay * 60)
+            elif format == "Hours":
+                time.sleep(delay * 3600)
+            elif format == "Days":
+                time.sleep(delay * 86400)
+
+            # time.sleep(5)  # Simuliamo l'attesa per un test più veloce
 
         elif node_data["type"] == "SEND_EMAIL":
             subject = node_data["data"]["settings"]["subject"]
