@@ -2,20 +2,21 @@ import json
 from rest_framework import serializers
 
 from campaigns.models import Campaign
-from .models import Workflow, WorkflowExecution, WorkflowExecutionStep
+from .models import Workflow, WorkflowExecution, WorkflowExecutionStep, WorkflowSettings
 
 
-# class WorkflowSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = Workflow
-#         fields = ['id', 'name', 'description', 'definition', 'status', 'created_at', 'updated_at']
+class WorkflowSettingsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WorkflowSettings
+        fields = '__all__'
 
 class WorkflowSerializer(serializers.ModelSerializer):
     campaign = serializers.PrimaryKeyRelatedField(queryset=Campaign.objects.all())
+    settings = WorkflowSettingsSerializer()  # Aggiunto il serializer delle impostazioni del workflow
 
     class Meta:
         model = Workflow
-        fields = ['id', 'campaign', 'name', 'description', 'definition', 'status', 'created_at', 'updated_at']
+        fields = ['id', 'campaign', 'name', 'description', 'definition', 'status', 'created_at', 'updated_at', 'settings']
 
     def validate_campaign(self, value):
         """ Assicurati che la campagna appartenga all'utente autenticato. """
@@ -23,6 +24,22 @@ class WorkflowSerializer(serializers.ModelSerializer):
         if value.user != request.user:
             raise serializers.ValidationError("Non puoi associare un workflow a una campagna che non ti appartiene.")
         return value
+    
+    def update(self, instance, validated_data):
+        """ Permette di aggiornare le impostazioni del workflow insieme al workflow stesso """
+        settings_data = validated_data.pop('settings', None)
+
+        # Aggiorna i dati del Workflow
+        instance = super().update(instance, validated_data)
+
+        # Aggiorna i dati delle impostazioni se presenti
+        if settings_data:
+            settings_instance = instance.settings
+            for key, value in settings_data.items():
+                setattr(settings_instance, key, value)
+            settings_instance.save()
+
+        return instance
 
 class WorkflowExecutionStepSerializer(serializers.ModelSerializer):
     class Meta:

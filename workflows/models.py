@@ -26,7 +26,33 @@ class Workflow(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class WorkflowSettings(models.Model):
+    workflow = models.OneToOneField(Workflow, on_delete=models.CASCADE, related_name="settings")
     
+    # Start options
+    start = models.CharField(max_length=10, choices=[('new', 'New Leads Only'), ('all', 'All Leads')], default='new')
+    
+    # Email sending settings
+    max_emails_per_day = models.IntegerField(default=50)
+    pause_between_emails = models.IntegerField(default=30)
+
+    # Handling replies
+    reply_action = models.CharField(max_length=10, choices=[('stop', 'Stop Workflow'), ('continue', 'Continue Workflow')], default='stop')
+
+    # Sending Schedule
+    sending_time_start = models.TimeField(default="08:00")
+    sending_time_end = models.TimeField(default="18:00")
+    sending_days = models.JSONField(default=list)  # ['monday', 'tuesday', ...]
+
+    # Unsubscribe & Bounce Handling
+    unsubscribe_handling = models.CharField(max_length=10, choices=[('remove', 'Remove'), ('exclude', 'Exclude')], default='remove')
+    bounce_handling = models.CharField(max_length=10, choices=[('stop', 'Stop Workflow'), ('retry', 'Retry with Another Template'), ('continue', 'Continue Workflow')], default='stop')
+
+    def __str__(self):
+        return f"Settings for {self.workflow.name}"
+
 
 class WorkflowExecutionStatus(models.TextChoices):
     PENDING = 'PENDING'

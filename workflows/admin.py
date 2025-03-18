@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Workflow, WorkflowExecution, WorkflowExecutionStep
+from .models import Workflow, WorkflowExecution, WorkflowExecutionStep, WorkflowSettings
 
 @admin.register(WorkflowExecutionStep)
 class WorkflowExecutionStepAdmin(admin.ModelAdmin):
@@ -24,3 +24,14 @@ class WorkflowAdmin(admin.ModelAdmin):
     list_filter = ("status", "user")
     search_fields = ("id", "name", "user__username")
     ordering = ("created_at",)
+
+@admin.register(WorkflowSettings)
+class WorkflowSettingsAdmin(admin.ModelAdmin):
+    list_display = (
+        "workflow", "start", "max_emails_per_day", "pause_between_emails",
+        "reply_action", "sending_time_start", "sending_time_end",
+        "unsubscribe_handling", "bounce_handling"
+    )
+    list_filter = ("start", "reply_action", "unsubscribe_handling", "bounce_handling")
+    search_fields = ("workflow__name", "workflow__user__username")
+    ordering = ("workflow",)
