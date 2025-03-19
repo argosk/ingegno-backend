@@ -53,7 +53,7 @@ def execute_step(step, lead_id):
             print(f"Waiting for {delay} {format}")
             # time.sleep(delay_hours * 3600)
             if format == "Minutes":
-                # TODO: Rimuovere il time.sleep e implementare con Celery (?) - da testare workflow con almeno 2 utenti
+                # TODO: Testare workflow con almeno 2 utenti
                 time.sleep(delay * 60)
             elif format == "Hours":
                 time.sleep(delay * 3600)

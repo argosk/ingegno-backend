@@ -1,3 +1,5 @@
+from uuid import UUID
+from django.shortcuts import get_object_or_404
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -41,16 +43,19 @@ class WorkflowViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['patch'], url_path='settings')    
     def update_settings(self, request, pk=None):
         """ Aggiorna solo i settings di un Workflow """
-        try:
-            workflow_settings = WorkflowSettings.objects.get(workflow_id=pk)
-        except WorkflowSettings.DoesNotExist:
-            return Response({"error": "Workflow settings not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Assicuriamoci che il workflow esista
+        workflow = get_object_or_404(Workflow, id=pk, user=request.user)
+
+        # Recupera i settings o creali se non esistono
+        workflow_settings, created = WorkflowSettings.objects.get_or_create(workflow=workflow)
 
         serializer = WorkflowSettingsSerializer(workflow_settings, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)        
+            return Response(serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)   
 
 
 class WorkflowExecutionViewSet(viewsets.ModelViewSet):
@@ -80,16 +85,22 @@ class WorkflowExecutionViewSet(viewsets.ModelViewSet):
 
             # ELIMINIAMO TUTTE LE ESECUZIONI PRECEDENTI
             WorkflowExecution.objects.filter(workflow=workflow).delete()
-            print("@DEBUG: ❌ Eliminati tutti i workflow precedenti")
         
             # CREIAMO UNA NUOVA ESECUZIONE
             workflow_execution = serializer.save()
-            print("@DEBUG: 🆕 Creato nuovo workflow_execution:", workflow_execution.id)
 
-            # AVVIAMO IL TASK CELERY (ora lavora su dati nuovi)
-            execute_workflow.delay(workflow_execution.id, 1)
-            # execute_workflow.delay(workflow_execution.id)
-            # run_workflow.delay(workflow_execution.id)
+            # # AVVIAMO IL TASK CELERY
+            # # Controllo i settings del workflow
+            # workflow_settings = workflow.settings       
+
+            # execute_workflow.delay(workflow_execution.id, 1, workflow_settings)
+
+            # if workflow_settings.start == "new":     
+            #     # Avvia il workflow solo per i nuovi leads che verranno aggiunti
+            #     execute_workflow.delay(workflow_execution.id, 1, workflow_settings)
+            # else:
+            #     # Avvia il workflow per tutti i leads
+            #     execute_workflow.delay(workflow_execution.id, None, workflow_settings)
 
             return Response(WorkflowExecutionWithStepsSerializer(workflow_execution).data, status=status.HTTP_201_CREATED)
         

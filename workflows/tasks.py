@@ -6,7 +6,7 @@ import json
 from workflows.workflow_executor import execute_step
 
 @shared_task
-def execute_workflow(workflow_execution_id, lead_id):
+def execute_workflow(workflow_execution_id, lead_id, settings):
     """
     Task Celery per eseguire un intero workflow in background, rispettando le condizioni e applicandolo a un lead specifico.
     """
