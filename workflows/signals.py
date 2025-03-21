@@ -1,6 +1,7 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from workflows.models import Workflow, WorkflowSettings, WorkflowStatus
+from workflows.tasks import execute_workflow
 
 @receiver(post_save, sender=Workflow)
 def process_workflow(sender, instance, **kwargs):

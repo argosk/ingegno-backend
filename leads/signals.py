@@ -1,6 +1,7 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from workflows.models import Workflow, WorkflowSettings, WorkflowStatus
+from workflows.models import Workflow, WorkflowExecution, WorkflowSettings, WorkflowStatus
+from workflows.tasks import execute_workflow
 from .models import Lead, LeadStatus
 
 @receiver(post_save, sender=Lead)
@@ -10,6 +11,7 @@ def process_new_lead(sender, instance, created, **kwargs):
     Recupera la campagna ID e le impostazioni di workflow associate.
     """
     if created and instance.status == LeadStatus.NEW:
+        print(f"👉 Nuovo lead aggiunto: {instance.name} ({instance.email})")
         # Ottenere l'ID della campagna
         campaign_id = instance.campaign.id
         print(f"Nuovo lead aggiunto: {instance.name} ({instance.email}), Campagna ID: {campaign_id}")
@@ -20,7 +22,8 @@ def process_new_lead(sender, instance, created, **kwargs):
         if workflow:
             # Ottenere le impostazioni del workflow
             workflow_settings = WorkflowSettings.objects.filter(workflow=workflow).first()
-            if workflow_settings and workflow_settings.start == "new":
+            # if workflow_settings and workflow_settings.start == "new":
+            if workflow_settings:
                 print(f"Workflow trovato: {workflow.id}")
                 print(f"Settings: Max Emails per Day: {workflow_settings.max_emails_per_day}")
                 print(f"Pause tra email: {workflow_settings.pause_between_emails} secondi")
@@ -30,8 +33,10 @@ def process_new_lead(sender, instance, created, **kwargs):
                 print(f"Gestione Unsubscribe: {workflow_settings.unsubscribe_handling}")
                 print(f"Gestione Bounce: {workflow_settings.bounce_handling}")
 
-                    # Esegui il workflow in background sul lead aggiunto
-                    # execute_workflow.delay(workflow.id, instance.id, workflow_settings)
+                # Esegui il workflow in background sul lead aggiunto
+                execution = WorkflowExecution.objects.filter(workflow=workflow).first()
+                print(f"Workflow Execution: {execution.id}")
+                execute_workflow.delay(execution.id, instance.id, None)
         else:
             print("⚠️ Nessun Workflow trovato per questa campagna.")
 

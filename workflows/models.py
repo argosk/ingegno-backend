@@ -54,25 +54,25 @@ class WorkflowSettings(models.Model):
         return f"Settings for {self.workflow.name}"
 
 
-class WorkflowExecutionStatus(models.TextChoices):
-    PENDING = 'PENDING'
-    RUNNING = 'RUNNING'
-    COMPLETED = 'COMPLETED'
-    FAILED = 'FAILED'
+# class WorkflowExecutionStatus(models.TextChoices):
+#     PENDING = 'PENDING'
+#     RUNNING = 'RUNNING'
+#     COMPLETED = 'COMPLETED'
+#     FAILED = 'FAILED'
 
 
 class WorkflowExecution(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     workflow = models.ForeignKey(Workflow, on_delete=models.CASCADE, related_name='executions')
     trigger = models.CharField(max_length=50) # Manuale, programmato, evento cronjob, webhook, ecc.
-    status = models.CharField(max_length=50, choices=WorkflowExecutionStatus.choices, default=WorkflowExecutionStatus.PENDING)
+    # status = models.CharField(max_length=50, choices=WorkflowExecutionStatus.choices, default=WorkflowExecutionStatus.PENDING)
     created_at = models.DateTimeField(auto_now_add=True)
     started_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     is_obsolete = models.BooleanField(default=False)  # Campo per contrassegnare esecuzioni vecchie
 
     def __str__(self):
-        return f"{self.workflow.name} - {self.status}"
+        return f"{self.workflow.name}"
     
 
 class WorkflowExecutionStepStatus(models.TextChoices):
@@ -86,7 +86,7 @@ class WorkflowExecutionStepStatus(models.TextChoices):
 class WorkflowExecutionStep(models.Model):
     id = models.UUIDField(primary_key=True, editable=False)
     workflow_execution = models.ForeignKey(WorkflowExecution, on_delete=models.CASCADE, related_name='steps')
-    status = models.CharField(max_length=50, choices=WorkflowExecutionStepStatus.choices, default=WorkflowExecutionStepStatus.CREATED)
+    # status = models.CharField(max_length=50, choices=WorkflowExecutionStepStatus.choices, default=WorkflowExecutionStepStatus.CREATED)
     parent_node_id = models.UUIDField(null=True, blank=True)
     number = models.IntegerField()
     node = models.JSONField()
@@ -95,7 +95,26 @@ class WorkflowExecutionStep(models.Model):
     started_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     credits_consumed = models.IntegerField(null=True, blank=True)
-    email_log = models.ForeignKey(EmailLog, null=True, blank=True, on_delete=models.SET_NULL)
+    # email_log = models.ForeignKey(EmailLog, null=True, blank=True, on_delete=models.SET_NULL)
 
     def __str__(self):
-        return f"Step {self.number} - {self.name} ({self.status})"
+        return f"Step {self.number} - {self.name}"
+
+class LeadWorkflowStateStatus(models.TextChoices):
+    RUNNING = 'RUNNING'
+    COMPLETED = 'COMPLETED'
+    FAILED = 'FAILED'
+
+class LeadStepStatus(models.Model):
+    lead = models.ForeignKey("leads.Lead", on_delete=models.CASCADE, related_name="step_statuses")
+    workflow = models.ForeignKey(Workflow, on_delete=models.CASCADE)
+    step = models.ForeignKey(WorkflowExecutionStep, on_delete=models.CASCADE)
+    status = models.CharField(max_length=50, choices=WorkflowExecutionStepStatus.choices, default=WorkflowExecutionStepStatus.CREATED)
+    condition = models.CharField(max_length=50, blank=True, null=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    email_log = models.ForeignKey(EmailLog, null=True, blank=True, on_delete=models.SET_NULL)
+
+
+    class Meta:
+        unique_together = ("lead", "workflow", "step")

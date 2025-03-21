@@ -50,7 +50,7 @@ INSTALLED_APPS = [
     'connected_accounts',
     'subscriptions',
     'campaigns',
-    'leads',   
+    'leads.apps.LeadsConfig',   
     'emails',
     # 'tracking', 
     'workflows',

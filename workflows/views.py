@@ -29,6 +29,20 @@ class WorkflowViewSet(viewsets.ModelViewSet):
         """ Associa il workflow all'utente autenticato e alla campagna selezionata """
         serializer.save(user=self.request.user)
 
+    @action(detail=True, methods=['patch'], url_path='status')
+    def update_status(self, request, pk=None):
+        """ Aggiorna solo lo stato del workflow """
+        workflow = self.get_object()
+        new_status = request.data.get('status')
+
+        if new_status not in ['DRAFT', 'PUBLISHED']:
+            raise serializers.ValidationError({'status': 'Invalid status value'}, code=status.HTTP_400_BAD_REQUEST)
+
+        workflow.status = new_status
+        workflow.save()
+
+        return Response({'status': workflow.status}, status=status.HTTP_200_OK)
+    
     # get workflows by campaign id
     @action(detail=False, methods=['get'], url_path='campaign/(?P<campaign_id>[^/.]+)')
     def get_by_campaign_id(self, request, campaign_id):

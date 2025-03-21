@@ -44,7 +44,8 @@ class WorkflowSerializer(serializers.ModelSerializer):
 class WorkflowExecutionStepSerializer(serializers.ModelSerializer):
     class Meta:
         model = WorkflowExecutionStep
-        fields = ['id', 'number', 'node', 'name', 'status', 'started_at', 'completed_at', 'credits_consumed', 'parent_node_id', 'condition']
+        fields = ['id', 'number', 'node', 'name', 'started_at', 'completed_at', 'credits_consumed', 'parent_node_id', 'condition']
+        # fields = ['id', 'number', 'node', 'name', 'status', 'started_at', 'completed_at', 'credits_consumed', 'parent_node_id', 'condition']
         # read_only_fields = ['id']
 
 
@@ -53,7 +54,8 @@ class WorkflowExecutionWithStepsSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = WorkflowExecution
-        fields = ['id', 'workflow', 'trigger', 'status', 'created_at', 'started_at', 'completed_at', 'steps']
+        # fields = ['id', 'workflow', 'trigger', 'status', 'created_at', 'started_at', 'completed_at', 'steps']
+        fields = ['id', 'workflow', 'trigger', 'created_at', 'started_at', 'completed_at', 'steps']
 
     def create(self, validated_data):
         steps_data = validated_data.pop('steps')
