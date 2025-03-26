@@ -164,13 +164,13 @@ def execute_step(step, lead_id, settings, task):
 
             print(f"Sending email from {connected_account.provider} ({email_account}) to {lead.email}: {subject}")
 
-            # if connected_account.provider == Provider.GMAIL:
-            #     send_email_gmail(connected_account, lead.email, subject, body)
-            # elif connected_account.provider == Provider.OUTLOOK:
-            #     send_email_outlook(connected_account, lead.email, subject, body)
-            # else:
-            #     send_email_smtp(connected_account, lead.email, subject, body)
-            print(f"Email sent to {lead.email} - Subject: {subject}")
+            if connected_account.provider == Provider.GMAIL:
+                send_email_gmail(connected_account, lead.email, subject, body)
+            elif connected_account.provider == Provider.OUTLOOK:
+                send_email_outlook(connected_account, lead.email, subject, body)
+            else:
+                send_email_smtp(connected_account, lead.email, subject, body)
+            # print(f"Email sent to {lead.email} - Subject: {subject}")
 
             # Registriamo l'invio nel log
             email_log = EmailLog.objects.create(

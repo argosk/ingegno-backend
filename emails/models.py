@@ -1,3 +1,4 @@
+import uuid
 from django.db import models
 from leads.models import Lead
 
@@ -44,11 +45,13 @@ class EmailOpenTracking(models.Model):
     
     
 class EmailReplyTracking(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     lead = models.ForeignKey(Lead, on_delete=models.CASCADE, related_name="replies")
     email_log = models.ForeignKey(EmailLog, on_delete=models.CASCADE, related_name="replies")
     subject = models.CharField(max_length=255)
     body = models.TextField()
     received_at = models.DateTimeField(auto_now_add=True)
+    read = models.BooleanField(default=False)
 
     class Meta:
         unique_together = ("lead", "email_log", "subject")  # Evita duplicati per lead + email_log + subject    
