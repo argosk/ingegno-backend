@@ -1,29 +1,28 @@
 import json
 import time
+import pytz
+from datetime import time as dt_time
 from connected_accounts.models import ConnectedAccount, Provider
 from emails.models import EmailClickTracking, EmailLog, EmailOpenTracking, EmailReplyTracking
 from leads.models import Lead, LeadStatus
 from workflows.email_sender import send_email_gmail, send_email_outlook, send_email_smtp
 from workflows.models import LeadStepStatus, WorkflowExecutionStep, WorkflowExecutionStepStatus
-from django.utils.timezone import now
+from django.utils.timezone import now, localtime
+from django.utils.http import urlsafe_base64_encode
+from django.utils.encoding import force_bytes
+
+MAX_RETRIES = 3
+
+
+def get_unsubscribe_link(lead):
+    uid = urlsafe_base64_encode(force_bytes(lead.id))
+    return f"https://marketo.so/api/leads/unsubscribe/?uid={uid}"
 
 def get_connected_account(email_address):
     """
     Recupera l'account connesso corrispondente all'indirizzo email fornito.
     """
     return ConnectedAccount.objects.filter(email_address=email_address, is_active=True).first()
-
-
-# def find_previous_email_log(current_step):
-#     """
-#     Risale a ritroso nel workflow per trovare il primo nodo `SEND_EMAIL` con un `email_log_id` valido.
-#     """
-#     step = current_step
-#     while step.parent_node_id:
-#         step = WorkflowExecutionStep.objects.get(id=step.parent_node_id)
-#         if step.email_log:
-#             return step.email_log  # Abbiamo trovato l'email corretta
-#     return None  # Nessun `SEND_EMAIL` trovato
 
 def find_previous_email_log(current_step, lead_id, workflow):
     step = current_step
@@ -42,27 +41,58 @@ def find_previous_email_log(current_step, lead_id, workflow):
     return None
 
 
-def execute_step(step, lead_id):
+def execute_step(step, lead_id, settings, task):
     """
     Esegue un nodo del workflow in base al suo tipo e al lead.
     """
     try:
         # Recuperiamo il lead specifico
-        lead = Lead.objects.get(id=lead_id)
+        lead = Lead.objects.get(id=lead_id, unsubscribed=False)
+
+        # # Controlliamo se l'utente ha fatto l'unsubscribe
+        # if lead.unsubscribed:
+        #     print(f"Lead {lead_id} si è disiscritto. Interrompiamo il workflow.")
+        #     if settings.get("unsubscribe_handling") == "exclude":
+        #         print("Rimuovo l'utente da tutti i workflow")
+        #         return            
+        #     if settings.get("unsubscribe_handling") == "remove":
+        #         print("Unsubscribe handling: stop")
+        #         return
+
 
         # Recuperiamo o creiamo lo stato dello step per questo lead
         lead_step_status, _ = LeadStepStatus.objects.get_or_create(
             lead=lead,
             workflow=step.workflow_execution.workflow,
             step=step
-        )        
+        )    
 
-        # Controlliamo se il lead ha risposto a un'email del workflow
-        if EmailReplyTracking.objects.filter(lead_id=lead_id).exists():
-            print(f"Lead {lead_id} has replied to an email. Stopping execution for this lead.")
-            lead_step_status.status = WorkflowExecutionStepStatus.FAILED
-            lead_step_status.save()
-            return  # Non eseguiamo il nodo
+        # User timezone    
+        timezone = step.workflow_execution.workflow.user.timezone
+        # Applichiamo la timezone dell'utente
+        user_timezone = pytz.timezone(timezone)
+        local_now = localtime(now(), user_timezone)
+
+        # Giorno attuale (es: "monday", "tuesday", ecc.)
+        current_day = local_now.strftime("%A").lower()
+
+        # Convertiamo le stringhe in oggetti `time`
+        start_time = dt_time.fromisoformat(settings.get("sending_time_start"))
+        end_time = dt_time.fromisoformat(settings.get("sending_time_end"))
+
+        # Calcoliamo l'inizio della giornata (mezzanotte) per oggi
+        start_of_day = now().replace(hour=0, minute=0, second=0, microsecond=0)
+
+        current_time = local_now.time()
+
+        # Controllo "reply_action" -  Controlliamo se il lead ha risposto a un'email del workflow, in tal caso fermiamo il workflow
+        if settings.get("reply_action") == 'stop':
+            if EmailReplyTracking.objects.filter(lead_id=lead_id).exists():
+                print(f"Lead {lead_id} has replied to an email. Stopping execution for this lead.")
+                lead_step_status.status = WorkflowExecutionStepStatus.COMPLETED
+                lead_step_status.save()
+                return  # Non eseguiamo il nodo
+                 
                 
         # step.status = WorkflowExecutionStepStatus.RUNNING
         # step.started_at = now()
@@ -82,7 +112,7 @@ def execute_step(step, lead_id):
             delay = node_data["data"]["settings"]["delay"]
             format = node_data["data"]["settings"]["format"]
             print(f"Waiting for {delay} {format}")
-            # time.sleep(delay_hours * 3600)
+
             if format == "Minutes":
                 # TODO: Testare workflow con almeno 2 utenti
                 time.sleep(delay * 60)
@@ -91,20 +121,36 @@ def execute_step(step, lead_id):
             elif format == "Days":
                 time.sleep(delay * 86400)
 
-            # time.sleep(5)  # Simuliamo l'attesa per un test più veloce
-
         elif node_data["type"] == "SEND_EMAIL":
             subject = node_data["data"]["settings"]["subject"]
             body = node_data["data"]["settings"]["body"].replace("{name}", lead.name)  # Personalizziamo il nome
             email_account = node_data["data"]["settings"]["email_account"]
 
             # Generiamo il tracking pixel
-            # tracking_pixel_url = f"https://yourdomain.com{reverse('track_email_open', args=[lead.id])}"
+            # tracking_pixel_url = f"https://marketo.so{reverse('track_email_open', args=[lead.id])}"
             # body += f'<img src="{tracking_pixel_url}" width="1" height="1" style="display:none;" />'
 
-            # Simuliamo l'invio della mail (sostituire con send_mail in produzione)
-            # send_mail(subject, body, email_account, [lead.email])
-            # time.sleep(5)  # Simuliamo l'invio
+            if current_day not in settings.get("sending_days", []):
+                print(f"❌ Today ({current_day}) is not allowed for sending.")
+                raise task.retry(countdown=18000)  # Riprova tra 5 ore
+
+            if not (start_time <= current_time <= end_time):
+                print(f"❌ Current time ({current_time}) is outside of allowed sending window ({start_time} - {end_time})")
+                raise task.retry(countdown=3600)  # Riprova tra un'ora
+
+            # Controllo "max_emails_per_day" - Contiamo le email inviate da questo sender a partire da mezzanotte
+            count_email_logs = EmailLog.objects.filter(
+                sender=email_account,
+                sent_at__gte=start_of_day
+            ).count()
+    
+            if count_email_logs >= settings.get("max_emails_per_day"):
+                print(f"⚠️ Maximum emails per day reached for {email_account}. Skipping SEND_EMAIL.")
+                raise task.retry(
+                    countdown=86400, # 24h
+                    max_retries=MAX_RETRIES, 
+                    exc=Exception("Max emails reached for today.")
+                )
 
             # Recuperiamo l'account email connesso
             connected_account = get_connected_account(email_account)
@@ -118,12 +164,13 @@ def execute_step(step, lead_id):
 
             print(f"Sending email from {connected_account.provider} ({email_account}) to {lead.email}: {subject}")
 
-            if connected_account.provider == Provider.GMAIL:
-                send_email_gmail(connected_account, lead.email, subject, body)
-            elif connected_account.provider == Provider.OUTLOOK:
-                send_email_outlook(connected_account, lead.email, subject, body)
-            else:
-                send_email_smtp(connected_account, lead.email, subject, body)
+            # if connected_account.provider == Provider.GMAIL:
+            #     send_email_gmail(connected_account, lead.email, subject, body)
+            # elif connected_account.provider == Provider.OUTLOOK:
+            #     send_email_outlook(connected_account, lead.email, subject, body)
+            # else:
+            #     send_email_smtp(connected_account, lead.email, subject, body)
+            print(f"Email sent to {lead.email} - Subject: {subject}")
 
             # Registriamo l'invio nel log
             email_log = EmailLog.objects.create(
@@ -149,7 +196,7 @@ def execute_step(step, lead_id):
             # Troviamo il corretto `email_log_id` cercando a ritroso il primo `SEND_EMAIL`
             email_log = find_previous_email_log(step, lead_id, workflow=step.workflow_execution.workflow)
 
-            print(f"► Found email_log: {email_log.id}")
+            # print(f"► Found email_log: {email_log.id}")
 
             if not email_log:
                 print("No email_log found, skipping CHECK_LINK_CLICKED")

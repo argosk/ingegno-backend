@@ -63,7 +63,7 @@ class WorkflowSettings(models.Model):
 
 class WorkflowExecution(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    workflow = models.ForeignKey(Workflow, on_delete=models.CASCADE, related_name='executions')
+    workflow = models.OneToOneField(Workflow, on_delete=models.CASCADE, related_name='execution')
     trigger = models.CharField(max_length=50) # Manuale, programmato, evento cronjob, webhook, ecc.
     # status = models.CharField(max_length=50, choices=WorkflowExecutionStatus.choices, default=WorkflowExecutionStatus.PENDING)
     created_at = models.DateTimeField(auto_now_add=True)

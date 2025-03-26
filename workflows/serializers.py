@@ -12,7 +12,7 @@ class WorkflowSettingsSerializer(serializers.ModelSerializer):
 
 class WorkflowSerializer(serializers.ModelSerializer):
     campaign = serializers.PrimaryKeyRelatedField(queryset=Campaign.objects.all())
-    settings = WorkflowSettingsSerializer()  # Aggiunto il serializer delle impostazioni del workflow
+    settings = WorkflowSettingsSerializer(required=False)
 
     class Meta:
         model = Workflow
@@ -25,6 +25,20 @@ class WorkflowSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Non puoi associare un workflow a una campagna che non ti appartiene.")
         return value
     
+    def create(self, validated_data):
+        settings_data = validated_data.pop("settings", None)
+
+        # Crea il workflow
+        workflow = Workflow.objects.create(**validated_data)
+
+        # Se non arrivano settings, crea quelli di default
+        if settings_data:
+            WorkflowSettings.objects.create(workflow=workflow, **settings_data)
+        else:
+            WorkflowSettings.objects.create(workflow=workflow)  # usa i default del modello
+
+        return workflow
+
     def update(self, instance, validated_data):
         """ Permette di aggiornare le impostazioni del workflow insieme al workflow stesso """
         settings_data = validated_data.pop('settings', None)

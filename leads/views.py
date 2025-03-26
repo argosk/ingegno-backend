@@ -1,6 +1,8 @@
 from django.core.cache import cache
 from django.db.models import Count
 from django.utils.timezone import now, timedelta
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes, force_str
 from django.db.models import Q
 from rest_framework import viewsets, permissions, status, serializers
 from rest_framework.response import Response
@@ -56,6 +58,28 @@ class LeadViewSet(viewsets.ModelViewSet):
             raise serializers.ValidationError({"error": "You are not authorized to add leads to this campaign."}, code=status.HTTP_403_FORBIDDEN)
 
         serializer.save(campaign=campaign)
+
+    @action(detail=False, methods=['get'], url_path='unsubscribe', permission_classes=[permissions.AllowAny])
+    def unsubscribe(self, request):
+        """
+        Public endpoint to unsubscribe a lead using a base64 encoded ID.
+        Example: /api/leads/unsubscribe/?uid=Mg==
+        """
+        uid = request.query_params.get('uid')
+        if not uid:
+            return Response({'error': 'Missing uid parameter.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            lead_id = force_str(urlsafe_base64_decode(uid))
+            lead = Lead.objects.get(id=lead_id)
+        except (Lead.DoesNotExist, ValueError, TypeError):
+            return Response({'error': 'Invalid or non-existent lead.'}, status=status.HTTP_404_NOT_FOUND)
+
+        lead.unsubscribed = True
+        lead.save()
+
+        return Response({'message': 'Successfully unsubscribed.'}, status=status.HTTP_200_OK)
+
        
     @action(detail=False, methods=['post'], url_path='delete-leads', permission_classes=[permissions.IsAuthenticated])
     def delete_leads(self, request):

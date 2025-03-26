@@ -53,7 +53,7 @@ INSTALLED_APPS = [
     'leads.apps.LeadsConfig',   
     'emails',
     # 'tracking', 
-    'workflows',
+    'workflows.apps.WorkflowsConfig',
     # 'blog',
 ]
 

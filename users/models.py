@@ -1,3 +1,4 @@
+import pytz
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.base_user import BaseUserManager
@@ -40,6 +41,11 @@ class User(AbstractUser):
     credits = models.PositiveIntegerField(default=0)
     profile_image_url = models.CharField(max_length=255, blank=True)
     is_google_user = models.BooleanField(default=False)
+    timezone = models.CharField(
+        max_length=50,
+        choices=[(tz, tz) for tz in pytz.common_timezones],
+        default='UTC'
+    )
 
     objects = UserManager()
 

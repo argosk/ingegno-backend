@@ -1,7 +1,7 @@
 from celery import shared_task
 from django.utils.timezone import now
 from leads.models import Lead, LeadWorkflowExecutionStatus
-from workflows.models import WorkflowExecution, WorkflowExecutionStep, WorkflowExecutionStepStatus, LeadStepStatus
+from workflows.models import WorkflowExecution, WorkflowExecutionStep, WorkflowExecutionStepStatus, LeadStepStatus, WorkflowStatus
 import json
 
 from workflows.workflow_executor import execute_step
@@ -19,24 +19,30 @@ def check_and_complete_workflow_for_lead(workflow_execution, lead_id):
     else:
         print(f"⏳ Lead {lead_id}: workflow ancora in esecuzione ({incomplete_steps.count()} step incompleti)")
 
-@shared_task
-def execute_workflow(workflow_execution_id, lead_id, settings):
+@shared_task(bind=True)
+def execute_workflow(self, workflow_execution_id, lead_id, settings):
     """
     Task Celery per eseguire un intero workflow in background, rispettando le condizioni e applicandolo a un lead specifico.
     """
     try:
+
         workflow_execution = WorkflowExecution.objects.get(id=workflow_execution_id)
+
+        # Il seguente controllo non è necessario in quanto se si mette in DRAFT un workflow, non verrà eseguito
+        # poiché 
+        
+        # Controllo se lo stato del workflow si trova in DRAFT, se è così non eseguo il workflow
+        # workflow_status = workflow_execution.workflow.status
+        # if workflow_status == WorkflowStatus.DRAFT:
+        #     print(f"Workflow {workflow_execution.workflow.id} in stato DRAFT, non eseguito.")
+        #     return
+
+        
+        # print(f"--SETTINGS: {settings.get('max_emails_per_day')}")
         # workflow_execution.status = WorkflowExecutionStatus.RUNNING
         # workflow_execution.started_at = now()
         # workflow_execution.save()
 
-        # controllo se il numero di email inviate è inferiore al massimo consentito
-        # if settings.max_emails_per_day > 0:
-        #     # TODO: Controllare effettivamente se questa query funziona
-        #     email_logs = WorkflowExecutionStep.objects.filter(workflow_execution=workflow_execution, node__contains="SEND_EMAIL")
-        #     if email_logs.count() >= settings.max_emails_per_day:
-        #         print(f"Workflow execution stopped: Maximum emails per day reached.")
-        #         return
 
         # TODO: Gestire la pausa tra l'invio delle email se l'utente ha scelto come opzione di inviare le emails a tutti i contatti della lista già presenti. 
         # Probabilmente è meglio gestire una pausa tra l'eseuzione del workflow tra leads
@@ -84,7 +90,7 @@ def execute_workflow(workflow_execution_id, lead_id, settings):
                             continue
 
             # Eseguiamo il nodo passando il `lead_id`
-            execute_step(step, lead_id)
+            execute_step(step, lead_id, settings, task=self)
             executed_steps[step.id] = step
 
         # NON POSSIAMO IMPOSTARE IL WORKFLOW COME COMPLETATO

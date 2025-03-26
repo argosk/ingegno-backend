@@ -83,54 +83,54 @@ class WorkflowExecutionViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'], url_path='create-with-steps')
     def create_with_steps(self, request):
         """ Cancella le esecuzioni precedenti e crea una nuova WorkflowExecution con relativi WorkflowExecutionStep """
+        workflow_id = request.data.get("workflow")
+        
+        if not workflow_id:
+            return Response({"error": "workflow field is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Recupera il workflow
+        try:
+            workflow = Workflow.objects.get(id=workflow_id, user=request.user)
+        except Workflow.DoesNotExist:
+            return Response({"error": "Workflow not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # ELIMINA PRIMA le esecuzioni per evitare errore OneToOne
+        WorkflowExecution.objects.filter(workflow=workflow).delete()
+
+        # Ora che l'esecuzione precedente è stata eliminata, puoi validare
         serializer = WorkflowExecutionWithStepsSerializer(data=request.data)
-        
+
         if serializer.is_valid():
-            workflow_id = request.data.get("workflow")
-            
-            if not workflow_id:
-                return Response({"error": "workflow field is required"}, status=status.HTTP_400_BAD_REQUEST)
-
-            # Recupera il workflow
-            try:
-                workflow = Workflow.objects.get(id=workflow_id, user=request.user)
-            except Workflow.DoesNotExist:
-                return Response({"error": "Workflow not found"}, status=status.HTTP_404_NOT_FOUND)
-
-            # ELIMINIAMO TUTTE LE ESECUZIONI PRECEDENTI
-            WorkflowExecution.objects.filter(workflow=workflow).delete()
-        
-            # CREIAMO UNA NUOVA ESECUZIONE
             workflow_execution = serializer.save()
-
-            # # AVVIAMO IL TASK CELERY
-            # # Controllo i settings del workflow
-            # workflow_settings = workflow.settings       
-
-            # execute_workflow.delay(workflow_execution.id, 1, workflow_settings)
-
-            # if workflow_settings.start == "new":     
-            #     # Avvia il workflow solo per i nuovi leads che verranno aggiunti
-            #     execute_workflow.delay(workflow_execution.id, 1, workflow_settings)
-            # else:
-            #     # Avvia il workflow per tutti i leads
-            #     execute_workflow.delay(workflow_execution.id, None, workflow_settings)
-
             return Response(WorkflowExecutionWithStepsSerializer(workflow_execution).data, status=status.HTTP_201_CREATED)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)    
+    
+    # def create_with_steps(self, request):
+    #     """ Cancella le esecuzioni precedenti e crea una nuova WorkflowExecution con relativi WorkflowExecutionStep """
+    #     serializer = WorkflowExecutionWithStepsSerializer(data=request.data)
         
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    #     if serializer.is_valid():
+    #         workflow_id = request.data.get("workflow")
+            
+    #         if not workflow_id:
+    #             return Response({"error": "workflow field is required"}, status=status.HTTP_400_BAD_REQUEST)
 
+    #         # Recupera il workflow
+    #         try:
+    #             workflow = Workflow.objects.get(id=workflow_id, user=request.user)
+    #         except Workflow.DoesNotExist:
+    #             return Response({"error": "Workflow not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+    #         # ELIMINIAMO TUTTE LE ESECUZIONI PRECEDENTI
+    #         WorkflowExecution.objects.filter(workflow=workflow).delete()
+        
+    #         # CREIAMO UNA NUOVA ESECUZIONE
+    #         workflow_execution = serializer.save()
 
-# class WorkflowExecutionViewSet(viewsets.ModelViewSet):
-#     """ API ViewSet per le esecuzioni dei workflow """
-#     queryset = WorkflowExecution.objects.all()
-#     serializer_class = WorkflowExecutionSerializer
-#     permission_classes = [IsAuthenticated]
-
-#     def get_queryset(self):
-#         """ Mostra solo le esecuzioni di workflow appartenenti all'utente autenticato """
-#         return self.queryset.filter(workflow__user=self.request.user)
-
+    #         return Response(WorkflowExecutionWithStepsSerializer(workflow_execution).data, status=status.HTTP_201_CREATED)
+        
+    #     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class WorkflowExecutionStepViewSet(viewsets.ModelViewSet):
     """ API ViewSet per i passi di esecuzione di un workflow """

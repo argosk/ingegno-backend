@@ -9,11 +9,11 @@ class UserAdmin(DjangoUserAdmin):
         (None, {'fields': ('email', 'password', 'credits', 'is_google_user')}),
         ('Personal info', {'fields': ('first_name', 'last_name')}),
         ('Permissions', {'fields': ('is_active', 'is_staff', 'is_superuser', 'groups')}),
-        ('Important dates', {'fields': ('last_login', 'date_joined')}),
+        ('Important dates', {'fields': ('last_login', 'date_joined', 'timezone')}),
     )
     add_fieldsets = (
         (None, {
-            'classes': ('wide',),
+            'classes': ('wide',),   
             'fields': ('email', 'password1', 'password2')
         }),
     )

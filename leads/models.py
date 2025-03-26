@@ -20,6 +20,7 @@ class Lead(models.Model):
     company = models.CharField(max_length=255, blank=True, null=True)
     sequence = models.IntegerField(default=0) # Numero di email inviate al lead
     status = models.CharField(max_length=50, choices=LeadStatus.choices, default=LeadStatus.NEW)
+    unsubscribed = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     workflow_status = models.CharField(max_length=50, choices=LeadWorkflowExecutionStatus.choices, default=LeadWorkflowExecutionStatus.PENDING)
