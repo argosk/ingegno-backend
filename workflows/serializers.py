@@ -12,6 +12,7 @@ class WorkflowSettingsSerializer(serializers.ModelSerializer):
 
 class WorkflowSerializer(serializers.ModelSerializer):
     campaign = serializers.PrimaryKeyRelatedField(queryset=Campaign.objects.all())
+    # campaign_name = serializers.CharField(source='campaign.name', read_only=True)
     settings = WorkflowSettingsSerializer(required=False)
 
     class Meta:

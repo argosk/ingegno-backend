@@ -1,7 +1,7 @@
 @hostname = localhost
 @port = 8000
 @host = {{hostname}}:{{port}}
-@token = Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQwNDc0NDIwLCJpYXQiOjE3NDA0NzMyMjAsImp0aSI6IjgxNGYxMjNjYWRiZDQxOGRiZGE4NWQ2NTNiZDA2ZTExIiwidXNlcl9pZCI6Mn0.Haw_YwmtE_OkPflVMBSMLRdTQ_xvEgUX5BX-RvXQpmc
+@token = Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQzMDg0NzY2LCJpYXQiOjE3NDMwODM1NjYsImp0aSI6IjAxN2M1NGYwZGI2NjQwZDI4ODNhZjNhMDk0NTZhZWYxIiwidXNlcl9pZCI6M30.IVaX-VlGZhOUuOKYfhwa_EMXNXozVFMudxhWzok3gU4
 
 ### Register a new user
 POST http://{{host}}/api/users/register/ HTTP/1.1
@@ -19,7 +19,7 @@ POST http://{{host}}/api/token/ HTTP/1.1
 Content-Type: application/json
 
 {
-  "email": "marco@mail.com",
+  "email": "mario@mail.com",
   "password": "venezia123"
 }
 
@@ -70,6 +70,11 @@ Content-Type: application/json
 Authorization: {{token}}
 
 ### Get Leads
-GET http://{{host}}/api/leads/?campaign_id=1 HTTP/1.1
+GET http://{{host}}/api/leads/?campaign_id=UUID HTTP/1.1
+Content-Type: application/json
+Authorization: {{token}}
+
+### Get Workflows
+GET http://{{host}}/api/workflows/ HTTP/1.1
 Content-Type: application/json
 Authorization: {{token}}

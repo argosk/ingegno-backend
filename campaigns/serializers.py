@@ -1,14 +1,21 @@
 from rest_framework import serializers
+from workflows.models import Workflow 
 from .models import Campaign
 
 class CampaignSerializer(serializers.ModelSerializer):
     user = serializers.StringRelatedField(read_only=True)  # Mostra username invece dell'ID, opzionale
+    workflow_status = serializers.SerializerMethodField()
 
     class Meta:
         model = Campaign
-        fields = ['id', 'user', 'name', 'is_active', 'start_date', 'end_date', 'created_at', 'updated_at']
+        fields = ['id', 'user', 'name', 'is_active', 'start_date', 'end_date', 'created_at', 'updated_at', 'workflow_status']
         read_only_fields = ['id', 'user', 'created_at', 'updated_at']
 
+    def get_workflow_status(self, campaign):
+        try:
+            return campaign.workflow.status  # Accesso diretto via OneToOneField
+        except Workflow.DoesNotExist:
+            return None
         
 # from rest_framework import serializers
 # from leads.models import Lead
