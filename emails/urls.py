@@ -5,11 +5,14 @@ from emails.views import (
     UnreadRepliesCountView,
     track_link_click,
     LeadEmailRepliesListView,
-    MarkReplyAsReadView
+    MarkReplyAsReadView,
+    UniboxView
 )
 
 router = DefaultRouter()
 router.register(r'', EmailLogViewSet, basename="emails")  # ok: è un ViewSet
+router.register(r'unibox', UniboxView, basename="unibox")
+
 
 urlpatterns = [
     # Le altre view si registrano manualmente:

@@ -1,13 +1,18 @@
 from django.http import JsonResponse
 from django.utils.timezone import now
 from django.shortcuts import get_object_or_404
+from rest_framework.viewsets import ViewSet
+from rest_framework.decorators import action
 from rest_framework import viewsets, permissions, generics
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+from connected_accounts.models import ConnectedAccount, Provider
 from .models import EmailClickTracking, EmailLog, EmailReplyTracking, EmailStatus
 from .serializers import EmailLogSerializer, EmailReplyTrackingSerializer
+from .email_sender import send_email_gmail, send_email_outlook, send_email_smtp
 
 class EmailLogViewSet(viewsets.ModelViewSet):
     queryset = EmailLog.objects.all()
@@ -85,3 +90,84 @@ class UnreadRepliesCountView(APIView):
             read=False
         ).count()
         return Response({"unread_count": count})
+
+class UniboxView(ViewSet):
+    permission_classes = [IsAuthenticated]
+    
+    @action(detail=False, methods=['post'], url_path='email-reply')
+    def email_reply(self, request):
+        """Risponde a un'email ricevuta"""
+        email_id= request.data.get('email_id')
+        reply_body = request.data.get('body')
+
+        if not email_id or not reply_body:
+            return Response({"error": "Missing email_id or body"}, status=400)
+
+        try:
+            mail = EmailReplyTracking.objects.get(id=email_id, lead__campaign__user=request.user)
+        except EmailReplyTracking.DoesNotExist:
+            return Response({"error": "Email not found"}, status=404)        
+
+        sender_email = mail.email_log.sender
+        lead_email = mail.lead.email
+        original_message = mail.body
+        subject = mail.subject
+
+        # Formattazione della risposta includendo il messaggio originale
+        full_reply = f"""{reply_body}
+
+---
+
+{original_message}"""
+
+        # Controllo che l'email risulti ancora connessa al sistema
+        connected_account = ConnectedAccount.objects.filter(
+            email_address=sender_email, is_active=True
+        ).first()
+
+        if not connected_account:
+            return Response({"error": "Sender email is not connected"}, status=400)
+        
+        if connected_account.provider == Provider.GMAIL:
+            send_email_gmail(connected_account, lead_email, subject, full_reply)
+        elif connected_account.provider == Provider.OUTLOOK:
+            send_email_outlook(connected_account, lead_email, subject, full_reply)
+        else:
+            send_email_smtp(connected_account, lead_email, subject, full_reply)   
+
+        return Response({"message": "Email sent successfully"})
+    
+    @action(detail=False, methods=['delete'], url_path='email-delete')
+    def email_delete(self, request):
+        """Elimina un'email ricevuta"""
+        email_id = request.data.get('email_id')
+
+        if not email_id:
+            return Response({"error": "Missing email_id"}, status=400)
+
+        try:
+            mail = EmailReplyTracking.objects.get(id=email_id, lead__campaign__user=request.user)
+        except EmailReplyTracking.DoesNotExist:
+            return Response({"error": "Email not found"}, status=404)
+
+        mail.delete()
+        return Response({"message": "Email deleted successfully"})
+    
+    @action(detail=False, methods=['post'], url_path='email-as-unread')
+    def mark_as_unread(self, request):
+        """Imposta un'email come non letta"""
+        email_id = request.data.get('email_id')
+
+        if not email_id:
+            return Response({"error": "Missing email_id"}, status=400)
+
+        try:
+            mail = EmailReplyTracking.objects.get(id=email_id, lead__campaign__user=request.user)
+        except EmailReplyTracking.DoesNotExist:
+            return Response({"error": "Email not found"}, status=404)
+
+        mail.read = False
+        mail.save()
+        return Response({"message": "Email marked as unread"})
+    
+    

@@ -5,7 +5,7 @@ from datetime import time as dt_time
 from connected_accounts.models import ConnectedAccount, Provider
 from emails.models import EmailClickTracking, EmailLog, EmailOpenTracking, EmailReplyTracking
 from leads.models import Lead, LeadStatus
-from workflows.email_sender import send_email_gmail, send_email_outlook, send_email_smtp
+from emails.email_sender import send_email_gmail, send_email_outlook, send_email_smtp
 from workflows.models import LeadStepStatus, WorkflowExecutionStep, WorkflowExecutionStepStatus
 from django.utils.timezone import now, localtime
 from django.utils.http import urlsafe_base64_encode
