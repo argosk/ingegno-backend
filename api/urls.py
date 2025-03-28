@@ -6,6 +6,7 @@ from .views import (
     ResetPasswordView, 
     GoogleAuthURLView, 
     GoogleCallbackView,
+    DashboardStatsView,
     # TestEmailView,
 )
 
@@ -17,5 +18,6 @@ urlpatterns = [
     path('reset-password/', ResetPasswordView.as_view(), name='reset_password'),
     path('google-auth-url/', GoogleAuthURLView.as_view(), name='google_auth_url'),
     path('google/callback/', GoogleCallbackView.as_view(), name='google_callback'),
+    path('dashboard/stats/', DashboardStatsView.as_view(), name='dashboard_stats'),
     # path('test-email/', TestEmailView.as_view(), name='test_email'),
 ]

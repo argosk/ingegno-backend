@@ -2,15 +2,19 @@ import os
 import requests
 import secrets
 import certifi
+from datetime import timedelta
 from django.conf import settings
 from django.http import JsonResponse
 from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from django.contrib.auth.hashers import make_password
 from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes
+from django.utils import timezone
+from django.utils.timezone import localtime
 from django.core.mail import get_connection, EmailMultiAlternatives, send_mail
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView, TokenObtainPairView
 from rest_framework import status
@@ -18,6 +22,11 @@ from rest_framework import status
 from api.serializers import CustomTokenObtainPairSerializer, ForgotPasswordSerializer, ResetPasswordSerializer
 from subscriptions.models import StripeStatus, Subscription
 from users.models import User
+from campaigns.models import Campaign
+from leads.models import Lead, LeadStatus
+from emails.models import EmailReplyTracking  # dove hai definito il modello
+
+
 
 os.environ['SSL_CERT_FILE'] = certifi.where()
 
@@ -317,3 +326,133 @@ class TestEmailView(APIView):
             # Log dell'errore
             print(f"Errore durante l'invio dell'email: {e}")
             return Response({"error": f"Errore nell'invio dell'email: {str(e)}"}, status=500)
+
+
+class DashboardStatsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+
+        try:
+            range_days = int(request.query_params.get('range', 90))
+        except ValueError:
+            return Response({'error': 'Invalid range parameter.'}, status=400)
+
+        now = timezone.now()
+        start_date_current = now - timedelta(days=range_days)
+        start_date_previous = start_date_current - timedelta(days=range_days)
+        end_date_previous = start_date_current
+
+        # DEBUG: Stampa le date
+        # print("🕒 NOW:", localtime(now))
+        # print("🔸 CURRENT RANGE:", localtime(start_date_current), "→", localtime(now))
+        # print("🔹 PREVIOUS RANGE:", localtime(start_date_previous), "→", localtime(end_date_previous))
+
+        # === CURRENT PERIOD ===
+        campaigns_current = Campaign.objects.filter(user=user, created_at__gte=start_date_current)
+        leads_current = Lead.objects.filter(campaign__user=user, created_at__gte=start_date_current)
+        contacted_leads_current = leads_current.filter(status=LeadStatus.CONTACTED)
+        replies_current = EmailReplyTracking.objects.filter(
+            lead__campaign__user=user,
+            received_at__gte=start_date_current
+        ).distinct('lead')
+
+        # === PREVIOUS PERIOD ===
+        campaigns_prev = Campaign.objects.filter(user=user, created_at__range=(start_date_previous, end_date_previous))
+        leads_prev = Lead.objects.filter(campaign__user=user, created_at__range=(start_date_previous, end_date_previous))
+        contacted_leads_prev = leads_prev.filter(status=LeadStatus.CONTACTED)
+        replies_prev = EmailReplyTracking.objects.filter(
+            lead__campaign__user=user,
+            received_at__range=(start_date_previous, end_date_previous)
+        ).distinct('lead')
+
+        # === Count ===
+        campaigns_count = campaigns_current.count()
+        leads_count = leads_current.count()
+        replies_count = replies_current.count()
+        contacted_leads_count = contacted_leads_current.count()
+
+        # === Previous Count ===
+        campaigns_count_prev = campaigns_prev.count()
+        leads_count_prev = leads_prev.count()
+        replies_count_prev = replies_prev.count()
+        contacted_leads_prev_count = contacted_leads_prev.count()
+
+        # === DEBUG: stampa i conteggi
+        # print("📊 CURRENT PERIOD")
+        # print("  Campaigns:", campaigns_count)
+        # print("  Leads:", leads_count)
+        # print("  Contacted Leads:", contacted_leads_count)
+        # print("  Replies:", replies_count)
+
+        # print("📉 PREVIOUS PERIOD")
+        # print("  Campaigns:", campaigns_count_prev)
+        # print("  Leads:", leads_count_prev)
+        # print("  Contacted Leads:", contacted_leads_prev_count)
+        # print("  Replies:", replies_count_prev)
+
+        # === Reply Rate
+        reply_rate = (replies_count / contacted_leads_count * 100) if contacted_leads_count > 0 else 0
+        reply_rate_prev = (replies_count_prev / contacted_leads_prev_count * 100) if contacted_leads_prev_count > 0 else 0
+
+        # === Trend calcolo ===
+        def calc_trend(current, previous):
+            if previous == 0:
+                return None
+            return round(((current - previous) / previous) * 100, 2)
+
+        return Response({
+            'campaigns_count': campaigns_count,
+            'campaigns_trend': calc_trend(campaigns_count, campaigns_count_prev),
+
+            'leads_count': leads_count,
+            'leads_trend': calc_trend(leads_count, leads_count_prev),
+
+            'replies_count': replies_count,
+            'replies_trend': calc_trend(replies_count, replies_count_prev),
+
+            'reply_rate': round(reply_rate, 2),
+            'reply_rate_trend': calc_trend(reply_rate, reply_rate_prev),
+
+            'range_days': range_days
+        })
+
+# class DashboardStatsView(APIView):
+#     permission_classes = [IsAuthenticated]
+
+#     def get(self, request):
+#         user = request.user
+
+#         try:
+#             range_days = int(request.query_params.get('range', 90))
+#         except ValueError:
+#             return Response({'error': 'Invalid range parameter.'}, status=400)
+
+#         start_date = timezone.now() - timedelta(days=range_days)
+
+#         # Campagne e lead dell'utente nel range
+#         campaigns = Campaign.objects.filter(user=user, created_at__gte=start_date)
+#         leads = Lead.objects.filter(campaign__user=user, created_at__gte=start_date)
+        
+#         # Lead contattati
+#         contacted_leads = leads.filter(status=LeadStatus.CONTACTED)
+#         contacted_leads_count = contacted_leads.count()
+
+#         # Reply (unici per lead) nel range
+#         replies = EmailReplyTracking.objects.filter(
+#             lead__campaign__user=user,
+#             received_at__gte=start_date
+#         ).distinct('lead')
+
+#         replies_count = replies.count()
+
+#         reply_rate = (replies_count / contacted_leads_count * 100) if contacted_leads_count > 0 else 0
+
+#         return Response({
+#             'campaigns_count': campaigns.count(),
+#             'leads_count': leads.count(),
+#             'replies_count': replies_count,
+#             'reply_rate': round(reply_rate, 2),
+#             'range_days': range_days
+#         })
