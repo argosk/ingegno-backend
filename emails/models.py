@@ -58,11 +58,3 @@ class EmailReplyTracking(models.Model):
 
     def __str__(self):
         return f"Reply from {self.lead.email} - {self.subject}"    
-
-# class ClickLog(models.Model):
-#     email_log = models.ForeignKey(EmailLog, on_delete=models.CASCADE, related_name="clicks")
-#     link = models.URLField()
-#     clicked_at = models.DateTimeField(auto_now_add=True)
-
-#     def __str__(self):
-#         return f"Click on {self.link} by {self.email_log.lead.email}"
