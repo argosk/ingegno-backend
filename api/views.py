@@ -10,7 +10,8 @@ from django.contrib.auth.hashers import make_password
 from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes
 from django.utils import timezone
-from django.utils.timezone import localtime
+from django.utils.timezone import localtime, now
+from django.db.models import Count
 from django.core.mail import get_connection, EmailMultiAlternatives, send_mail
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -24,8 +25,7 @@ from subscriptions.models import StripeStatus, Subscription
 from users.models import User
 from campaigns.models import Campaign
 from leads.models import Lead, LeadStatus
-from emails.models import EmailReplyTracking  # dove hai definito il modello
-
+from emails.models import EmailLog, EmailReplyTracking
 
 
 os.environ['SSL_CERT_FILE'] = certifi.where()
@@ -417,6 +417,53 @@ class DashboardStatsView(APIView):
 
             'range_days': range_days
         })
+    
+
+class GlobalEmailPerformanceView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        try:
+            period_days = int(request.query_params.get('range', 30))
+        except ValueError:
+            return Response({'error': 'Invalid range'}, status=400)
+
+        start_date = (now() - timedelta(days=period_days)).date()
+        end_date = now().date()
+
+        # Genera tutte le date nel range
+        date_range = [
+            (start_date + timedelta(days=i)).isoformat()
+            for i in range((end_date - start_date).days + 1)
+        ]
+
+        analytics_data = {
+            date: {"date": date, "sent": 0, "replied": 0}
+            for date in date_range
+        }
+
+        # EMAIL INVIATE
+        sent_data = EmailLog.objects.filter(
+            lead__campaign__user=user,
+            sent_at__date__gte=start_date
+        ).values('sent_at__date').annotate(count=Count('id'))
+
+        for entry in sent_data:
+            date_str = entry['sent_at__date'].isoformat()
+            analytics_data[date_str]["sent"] = entry["count"]
+
+        # RISPOSTE
+        reply_data = EmailReplyTracking.objects.filter(
+            lead__campaign__user=user,
+            received_at__date__gte=start_date
+        ).values('received_at__date').annotate(count=Count('id'))
+
+        for entry in reply_data:
+            date_str = entry['received_at__date'].isoformat()
+            analytics_data[date_str]["replied"] = entry["count"]
+
+        return Response(list(analytics_data.values()))    
 
 # class DashboardStatsView(APIView):
 #     permission_classes = [IsAuthenticated]
