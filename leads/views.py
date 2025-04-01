@@ -140,8 +140,7 @@ class LeadViewSet(viewsets.ModelViewSet):
         total_leads = Lead.objects.filter(campaign=campaign).count()
         contacted_leads = Lead.objects.filter(campaign=campaign, status=LeadStatus.CONTACTED).count()
 
-        opened_emails = EmailLog.objects.filter(lead__campaign=campaign, status=EmailStatus.OPENED).count()
-        # replied_emails = EmailLog.objects.filter(lead__campaign=campaign, response_received=True).count()
+        opened_emails = EmailOpenTracking.objects.filter(lead__campaign=campaign, opened=True).count()
         replied_emails = EmailReplyTracking.objects.filter(lead__campaign=campaign).count()
 
         return Response({

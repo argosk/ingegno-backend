@@ -1,9 +1,11 @@
 import uuid
 from django.db import models
+from django.utils.timezone import now
 from leads.models import Lead
 
 class EmailStatus(models.TextChoices):
     SENT = "sent", "Sent"
+    PENDING = "pending", "Pending"
     OPENED = "opened", "Opened"
     CLICKED = "clicked", "Clicked"
     REPLIED = "replied", "Replied"
@@ -12,10 +14,19 @@ class EmailStatus(models.TextChoices):
 class EmailLog(models.Model):
     lead = models.ForeignKey(Lead, on_delete=models.CASCADE, related_name="emails")
     subject = models.CharField(max_length=255)
-    body = models.TextField()
-    sent_at = models.DateTimeField(auto_now_add=True)
-    status = models.CharField(max_length=50, choices=EmailStatus.choices, default=EmailStatus.SENT)
+    body = models.TextField(blank=True)  # inizialmente vuoto
+    sent_at = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(max_length=50, choices=EmailStatus.choices, default=EmailStatus.PENDING)
     sender = models.EmailField()
+
+    def mark_sent(self):
+        self.status = EmailStatus.SENT
+        self.sent_at = now()
+        self.save()
+
+    def mark_failed(self):
+        self.status = EmailStatus.FAILED
+        self.save()
 
     def __str__(self):
         return f"Email to {self.lead.email} - {self.get_status_display()}"
@@ -42,6 +53,11 @@ class EmailOpenTracking(models.Model):
 
     def __str__(self):
         return f"Lead {self.lead.email} - Opened: {self.opened}"
+    
+    class Meta:
+        unique_together = ("lead", "email_log")
+        # Evita duplicati per lead + email_log
+        # Se un lead apre più volte la stessa email, non creerà più record
     
     
 class EmailReplyTracking(models.Model):

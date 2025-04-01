@@ -3,10 +3,13 @@ import time
 import pytz
 from datetime import time as dt_time
 from connected_accounts.models import ConnectedAccount, Provider
-from emails.models import EmailClickTracking, EmailLog, EmailOpenTracking, EmailReplyTracking
+from emails.models import EmailClickTracking, EmailLog, EmailReplyTracking, EmailStatus
 from leads.models import Lead, LeadStatus
 from emails.email_sender import send_email_gmail, send_email_outlook, send_email_smtp
 from workflows.models import LeadStepStatus, WorkflowExecutionStep, WorkflowExecutionStepStatus
+from django.conf import settings as ingegno_settings
+from django.core import signing
+from django.urls import reverse
 from django.utils.timezone import now, localtime
 from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes
@@ -122,13 +125,30 @@ def execute_step(step, lead_id, settings, task):
                 time.sleep(delay * 86400)
 
         elif node_data["type"] == "SEND_EMAIL":
+
             subject = node_data["data"]["settings"]["subject"]
             body = node_data["data"]["settings"]["body"].replace("{name}", lead.name)  # Personalizziamo il nome
             email_account = node_data["data"]["settings"]["email_account"]
 
+            # Crea EmailLog PENDING
+            email_log = EmailLog.objects.create(
+                lead=lead,
+                subject=subject,
+                sender=email_account,
+                status=EmailStatus.PENDING
+            )
+
             # Generiamo il tracking pixel
-            # tracking_pixel_url = f"https://marketo.so{reverse('track_email_open', args=[lead.id])}"
-            # body += f'<img src="{tracking_pixel_url}" width="1" height="1" style="display:none;" />'
+            # tracking_pixel_url = f"https://yourdomain.com{reverse('track_email_open', args=[email_log.id, lead.id])}"
+            # body += f'<img src="{tracking_pixel_url}" width="1" height="1" style="display:none;" alt="" />'
+
+            signed_data = signing.dumps({
+                "lead_id": lead.id,
+                "email_log_id": email_log.id,
+            })
+
+            tracking_pixel_url = f"https://{ingegno_settings.DOMAIN}{reverse('track_email_open', args=[signed_data])}"
+            print(f"Tracking pixel URL: {tracking_pixel_url}")
 
             if current_day not in settings.get("sending_days", []):
                 print(f"❌ Today ({current_day}) is not allowed for sending.")
@@ -173,12 +193,16 @@ def execute_step(step, lead_id, settings, task):
             # print(f"Email sent to {lead.email} - Subject: {subject}")
 
             # Registriamo l'invio nel log
-            email_log = EmailLog.objects.create(
-                lead=lead,
-                subject=subject,
-                body=body,
-                sender=email_account
-            )
+            # email_log = EmailLog.objects.create(
+            #     lead=lead,
+            #     subject=subject,
+            #     body=body,
+            #     sender=email_account
+            # )
+
+            # Aggiorniamo lo stato dell'email log
+            email_log.body = body
+            email_log.mark_sent()
 
             # Segniamo il lead come contattato
             lead.status = LeadStatus.CONTACTED
@@ -235,3 +259,4 @@ def execute_step(step, lead_id, settings, task):
         lead_step_status.status = WorkflowExecutionStepStatus.FAILED
         lead_step_status.save()
         print(f"Step execution failed: {e}")
+ 
