@@ -55,10 +55,8 @@ class ChangePasswordSerializer(serializers.Serializer):
         self.context['request'].user.save()
         return self.context['request'].user
     
-class UpdateUserSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = User
-        fields = ['first_name', 'last_name', 'email']
+class ChangeEmailSerializer(serializers.Serializer):
+    email = serializers.EmailField()
 
     def validate_email(self, value):
         user = self.context['request'].user
@@ -66,9 +64,27 @@ class UpdateUserSerializer(serializers.ModelSerializer):
             raise ValidationError("This email is already used by another user.")
         return value
 
+    def save(self):
+        user = self.context['request'].user
+        user.email = self.validated_data['email']
+        user.save()
+        return user
+    
+class UpdateUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['first_name', 'last_name']
+        # fields = ['first_name', 'last_name', 'email']
+
+    # def validate_email(self, value):
+    #     user = self.context['request'].user
+    #     if User.objects.filter(email=value).exclude(pk=user.pk).exists():
+    #         raise ValidationError("This email is already used by another user.")
+    #     return value
+
     def update(self, instance, validated_data):
         instance.first_name = validated_data.get('first_name', instance.first_name)
         instance.last_name = validated_data.get('last_name', instance.last_name)
-        instance.email = validated_data.get('email', instance.email)
+        # instance.email = validated_data.get('email', instance.email)
         instance.save()
         return instance

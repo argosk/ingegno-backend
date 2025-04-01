@@ -12,12 +12,13 @@ class WorkflowSettingsSerializer(serializers.ModelSerializer):
 
 class WorkflowSerializer(serializers.ModelSerializer):
     campaign = serializers.PrimaryKeyRelatedField(queryset=Campaign.objects.all())
-    # campaign_name = serializers.CharField(source='campaign.name', read_only=True)
+    campaign_name = serializers.CharField(source='campaign.name', read_only=True)
     settings = WorkflowSettingsSerializer(required=False)
 
     class Meta:
         model = Workflow
-        fields = ['id', 'campaign', 'name', 'description', 'definition', 'status', 'created_at', 'updated_at', 'settings']
+        fields = ['id', 'campaign', 'campaign_name', 'name', 'description', 'definition', 'status', 'created_at', 'updated_at', 'settings']
+        read_only_fields = ['campaign_name', 'created_at', 'updated_at']
 
     def validate_campaign(self, value):
         """ Assicurati che la campagna appartenga all'utente autenticato. """

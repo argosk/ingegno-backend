@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from subscriptions.models import Subscription, StripeStatus
-from .serializers import RegisterSerializer, UserSerializer, ChangePasswordSerializer, UpdateUserSerializer
+from .serializers import ChangeEmailSerializer, RegisterSerializer, UserSerializer, ChangePasswordSerializer, UpdateUserSerializer
 
 
 class MeView(APIView):
@@ -49,13 +49,24 @@ class ChangePasswordView(APIView):
             serializer.save()
             return Response({"message": "Password changed successfully"}, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
+class ChangeEmailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request):
+        serializer = ChangeEmailSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            user = request.user
+            user.email = serializer.validated_data['email']
+            user.save()
+            return Response({"message": "Email changed successfully"}, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class UpdateUserView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def put(self, request):
-        serializer = UpdateUserSerializer(instance=request.user, data=request.data, context={'request': request})
+    def patch(self, request):
+        serializer = UpdateUserSerializer(instance=request.user, data=request.data, partial=True, context={'request': request})
         if serializer.is_valid():
             user = serializer.save()
             return Response({
