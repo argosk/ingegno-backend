@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from emails.views import (
     EmailLogViewSet,
     UnreadRepliesCountView,
-    track_link_click,
+    track_email_click,
     LeadEmailRepliesListView,
     MarkReplyAsReadView,
     UniboxView,
@@ -17,7 +17,7 @@ router.register(r'unibox', UniboxView, basename="unibox")
 
 urlpatterns = [
     # Le altre view si registrano manualmente:
-    path("track-click/<uuid:email_log_id>/", track_link_click, name="track_link_click"),
+    path("track-click/<str:signed_data>/", track_email_click, name="track_email_click"),
     path("track-email-open/<str:signed_data>/", track_email_open, name="track_email_open"),
     path("replies/", LeadEmailRepliesListView.as_view(), name="lead-email-replies"),
     path("replies/unread-count/", UnreadRepliesCountView.as_view(), name="unread-replies-count"),

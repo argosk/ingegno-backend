@@ -1,5 +1,5 @@
 import base64
-from django.http import Http404, JsonResponse, HttpResponse
+from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.utils.timezone import now
 from django.core import signing
 from django.shortcuts import get_object_or_404
@@ -32,22 +32,35 @@ class EmailLogViewSet(viewsets.ModelViewSet):
         return EmailLog.objects.filter(lead__campaign__user=user)
 
 @csrf_exempt
-def track_link_click(request, email_log_id):
-    """Registra il clic su un link da un'email"""
-    email_log = get_object_or_404(EmailLog, id=email_log_id)
-    link = request.GET.get("link")
+def track_email_click(request, signed_data):
+    try:
+        data = signing.loads(signed_data)
+        lead_id = data["lead_id"]
+        email_log_id = data["email_log_id"]
+        target_url = data["url"]
+    except signing.BadSignature:
+        raise Http404("Invalid or tampered tracking link.")
 
-    if not link:
-        return JsonResponse({"error": "Missing link parameter"}, status=400)
+    try:
+        lead = Lead.objects.get(id=lead_id)
+        email_log = EmailLog.objects.get(id=email_log_id)
+    except (Lead.DoesNotExist, EmailLog.DoesNotExist):
+        raise Http404("Invalid tracking data")
 
-    EmailClickTracking.objects.create(email_log=email_log, link=link, clicked_at=now())
+    # Evita registrazioni duplicate
+    tracking, created = EmailClickTracking.objects.get_or_create(
+        lead=lead,
+        email_log=email_log,
+        link=target_url,
+        defaults={"clicked": True, "clicked_at": now()}
+    )
 
-    # Aggiorna lo stato dell'email se non era già "CLICKED"
-    if email_log.status != EmailStatus.CLICKED:
-        email_log.status = EmailStatus.CLICKED
-        email_log.save()
+    if not created and not tracking.clicked:
+        tracking.clicked = True
+        tracking.clicked_at = now()
+        tracking.save()
 
-    return JsonResponse({"success": True})
+    return HttpResponseRedirect(target_url)
 
 @csrf_exempt
 def track_email_open(request, signed_data):
@@ -80,11 +93,6 @@ def track_email_open(request, signed_data):
         "R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=="
     )
     return HttpResponse(pixel_gif, content_type="image/gif")
-
-def generate_tracked_link(email_log: EmailLog, original_link: str) -> str:
-    """Genera un link tracciato che passa da Django prima di reindirizzare l'utente"""
-    base_tracking_url = f"http://{settings.DOMAIN}/api/emails/track-click/"
-    return f"{base_tracking_url}{email_log.id}/?link={original_link}"
 
 class StandardPagination(PageNumberPagination):
     page_size = 10
