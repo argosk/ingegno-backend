@@ -10,17 +10,23 @@ from emails.email_sender import send_email_gmail, send_email_outlook, send_email
 from workflows.models import LeadStepStatus, WorkflowExecutionStep, WorkflowExecutionStepStatus
 from django.conf import settings as ingegno_settings
 from django.core import signing
+from django.forms.models import model_to_dict
 from django.urls import reverse
 from django.utils.timezone import now, localtime
 from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes
 
+
 MAX_RETRIES = 3
 
 
+# def get_unsubscribe_link(lead):
+#     uid = urlsafe_base64_encode(force_bytes(lead.id))
+#     return f"https://marketo.so/api/leads/unsubscribe/?uid={uid}"
+
 def get_unsubscribe_link(lead):
-    uid = urlsafe_base64_encode(force_bytes(lead.id))
-    return f"https://marketo.so/api/leads/unsubscribe/?uid={uid}"
+    signed = signing.dumps({"lead_id": lead.id})
+    return f"https://{ingegno_settings.DOMAIN}/api/leads/unsubscribe/?token={signed}"
 
 def wrap_plain_links(text: str) -> str:
     """
@@ -95,6 +101,39 @@ def find_previous_email_log(current_step, lead_id, workflow):
             continue
     return None
 
+# Funzioni personalizzate disponibili nei template
+CUSTOM_PLACEHOLDER_FUNCTIONS = {
+    "current_date": lambda lead: now().strftime("%d/%m/%Y"),
+    "unsubscribe_link": get_unsubscribe_link,  
+    # aggiungi qui altre funzioni custom se vuoi
+}
+
+def replace_placeholders(text: str, lead: Lead) -> str:
+    """
+    Sostituisce {placeholder} nel testo con:
+    - Campi del modello Lead (solo quelli del DB)
+    - Funzioni personalizzate definite in CUSTOM_PLACEHOLDER_FUNCTIONS
+    """
+    lead_data = model_to_dict(lead)
+
+    def replacer(match):
+        key = match.group(1)
+
+        # 1. Se è una funzione personalizzata, la eseguo
+        if key in CUSTOM_PLACEHOLDER_FUNCTIONS:
+            try:
+                return str(CUSTOM_PLACEHOLDER_FUNCTIONS[key](lead))
+            except Exception as e:
+                return f"[Errore: {e}]"
+
+        # 2. Se è un campo del modello Lead
+        if key in lead_data:
+            return str(lead_data[key])
+
+        # 3. Altrimenti lo lascio così com'è
+        return match.group(0)
+
+    return re.sub(r"\{([a-zA-Z0-9_]+)\}", replacer, text)
 
 def execute_step(step, lead_id, settings, task):
     """
@@ -178,8 +217,8 @@ def execute_step(step, lead_id, settings, task):
 
         elif node_data["type"] == "SEND_EMAIL":
 
-            subject = node_data["data"]["settings"]["subject"]
-            body = node_data["data"]["settings"]["body"].replace("{name}", lead.name)  # Personalizziamo il nome
+            subject = replace_placeholders(node_data["data"]["settings"]["subject"], lead)
+            body = replace_placeholders(node_data["data"]["settings"]["body"], lead)
             email_account = node_data["data"]["settings"]["email_account"]
 
             # Crea EmailLog PENDING
@@ -190,15 +229,14 @@ def execute_step(step, lead_id, settings, task):
                 status=EmailStatus.PENDING
             )
 
-            # Generiamo il tracking pixel
-            # tracking_pixel_url = f"https://yourdomain.com{reverse('track_email_open', args=[email_log.id, lead.id])}"
-
             signed_data = signing.dumps({
                 "lead_id": lead.id,
                 "email_log_id": email_log.id,
             })
 
+            # Genera l'URL del pixel di tracciamento
             tracking_pixel_url = f"https://{ingegno_settings.DOMAIN}{reverse('track_email_open', args=[signed_data])}"
+            # TODO: Abilitare il pixel di tracciamento
             # body += f'<img src="{tracking_pixel_url}" width="1" height="1" style="display:none;" alt="" />'
             print(f"Tracking pixel URL: {tracking_pixel_url}")
 

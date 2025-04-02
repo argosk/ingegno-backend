@@ -1,8 +1,9 @@
 from django.core.cache import cache
 from django.db.models import Count
 from django.utils.timezone import now, timedelta
-from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.http import urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
+from django.core import signing
 from django.db.models import Q
 from rest_framework import viewsets, permissions, status, serializers
 from rest_framework.response import Response
@@ -62,23 +63,27 @@ class LeadViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], url_path='unsubscribe', permission_classes=[permissions.AllowAny])
     def unsubscribe(self, request):
         """
-        Public endpoint to unsubscribe a lead using a base64 encoded ID.
-        Example: /api/leads/unsubscribe/?uid=Mg==
+        Public endpoint to unsubscribe a lead using a signed token.
+        Example: /api/leads/unsubscribe/?token=abc123xyz
         """
-        uid = request.query_params.get('uid')
-        if not uid:
-            return Response({'error': 'Missing uid parameter.'}, status=status.HTTP_400_BAD_REQUEST)
+        token = request.query_params.get('token')
+        if not token:
+            return Response({'error': 'Missing token parameter.'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            lead_id = force_str(urlsafe_base64_decode(uid))
+            # data = signing.loads(token, max_age=60*60*24*30)  # token valido 30 giorni
+            data = signing.loads(token)
+            lead_id = data.get('lead_id')
             lead = Lead.objects.get(id=lead_id)
-        except (Lead.DoesNotExist, ValueError, TypeError):
-            return Response({'error': 'Invalid or non-existent lead.'}, status=status.HTTP_404_NOT_FOUND)
+        except (signing.BadSignature, signing.SignatureExpired):
+            return Response({'error': 'Invalid or expired token.'}, status=status.HTTP_400_BAD_REQUEST)
+        except Lead.DoesNotExist:
+            return Response({'error': 'Lead not found.'}, status=status.HTTP_404_NOT_FOUND)
 
         lead.unsubscribed = True
         lead.save()
 
-        return Response({'message': 'Successfully unsubscribed.'}, status=status.HTTP_200_OK)
+        return Response({'message': 'Successfully unsubscribed.'}, status=status.HTTP_200_OK)    
 
        
     @action(detail=False, methods=['post'], url_path='delete-leads', permission_classes=[permissions.IsAuthenticated])
