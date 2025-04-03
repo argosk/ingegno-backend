@@ -6,6 +6,7 @@ from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from django.conf import settings
 from django.utils.timezone import now
+from leads.models import Lead, LeadStatus
 from emails.utils.throttling import is_account_throttled, update_throttle_status, reset_throttle_status
 
 
@@ -14,6 +15,16 @@ GMAIL_SEND_API_URL = "https://www.googleapis.com/gmail/v1/users/me/messages/send
 
 MICROSOFT_TOKEN_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/token"
 OUTLOOK_SEND_API_URL = "https://graph.microsoft.com/v1.0/me/sendMail"
+
+def handle_bounce(email, reason="Unknown"):
+    lead = Lead.objects.filter(email=email).first()
+    if lead:
+        print(f"🚫 Bounce detected for {email}: {reason}")
+        lead.status = LeadStatus.BOUNCED  # Aggiungi questo status se non esiste
+        # lead.bounce_reason = reason       # Crea questo campo se non esiste
+        lead.save()
+    else:
+        print(f"⚠️ Bounce received but no lead found for {email}")
 
 def refresh_outlook_token(account):
     """
@@ -110,6 +121,8 @@ def send_email_gmail(account, recipient, subject, body):
     else:
         print(f"Gmail: Failed to send email to {recipient}. Error: {response.text}")
         update_throttle_status(account)
+        if "Invalid To" in response.text or "Address not found" in response.text:
+            handle_bounce(recipient, reason="Invalid recipient (Gmail)")
 
 def send_email_outlook(account, recipient, subject, body):
     """
@@ -154,6 +167,8 @@ def send_email_outlook(account, recipient, subject, body):
     else:
         print(f"Outlook: Failed to send email to {recipient}. Error: {response.text}")
         update_throttle_status(account)
+        if "InvalidRecipients" in response.text or "not found" in response.text:
+            handle_bounce(recipient, reason="Invalid recipient (Outlook)")        
 
 # def send_email_outlook(account, recipient, subject, body):
 #     """
@@ -218,3 +233,5 @@ def send_email_smtp(account, recipient, subject, body):
     except Exception as e:
         print(f"SMTP: Failed to send email to {recipient}. Error: {e}")
         update_throttle_status(account)
+        if "550" in str(e) or "User unknown" in str(e):
+            handle_bounce(recipient, reason="Invalid recipient (SMTP)")        

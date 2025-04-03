@@ -6,6 +6,7 @@ class LeadStatus(models.TextChoices):
     NEW = "new"
     CONTACTED = "contacted"
     CONVERTED = "converted"
+    BOUNCED = "bounced"
 
 class LeadWorkflowExecutionStatus(models.TextChoices):
     PENDING = 'PENDING'
