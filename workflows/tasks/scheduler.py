@@ -1,6 +1,6 @@
 from celery import shared_task
-from django.utils.timezone import now
 from django.db import transaction
+from django.utils.timezone import now, timedelta
 from workflows.models import WorkflowExecution, WorkflowQueue
 from workflows.tasks.worker import execute_workflow
 
@@ -45,3 +45,22 @@ def schedule_workflow_batch():
         item.save()
 
     print(f"🚀 Processati {len(queue_items)} lead dal batch.")
+
+
+@shared_task(name="workflows.tasks.scheduler.reset_stuck_queue")
+def reset_stuck_queue(timeout_minutes=10):
+    """
+    Task per sbloccare lead nella WorkflowQueue rimasti bloccati con processing=True
+    da troppo tempo (es. worker crashati).
+    """
+    threshold_time = now() - timedelta(minutes=timeout_minutes)
+
+    stuck_items = WorkflowQueue.objects.filter(
+        processed=False,
+        processing=True,
+        updated_at__lt=threshold_time  # o `created_at`
+    )
+
+    count = stuck_items.update(processing=False)
+
+    print(f"🧹 Ripristinati {count} lead bloccati nella queue (timeout > {timeout_minutes} minuti)")
