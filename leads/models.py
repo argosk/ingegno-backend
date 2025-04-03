@@ -11,6 +11,7 @@ class LeadWorkflowExecutionStatus(models.TextChoices):
     PENDING = 'PENDING'
     COMPLETED = 'COMPLETED'
     FAILED = 'FAILED'
+    SKIPPED = 'SKIPPED'
 
 class Lead(models.Model):
     campaign = models.ForeignKey(Campaign, on_delete=models.CASCADE, related_name="leads")

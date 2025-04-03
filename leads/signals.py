@@ -1,24 +1,9 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from workflows.models import Workflow, WorkflowExecution, WorkflowSettings, WorkflowStatus
-from workflows.tasks import execute_workflow
+from workflows.tasks.worker import execute_workflow
 from .models import Lead, LeadStatus
-
-def serialize_workflow_settings(settings):
-    if not settings:
-        return None
-
-    return {
-        "max_emails_per_day": settings.max_emails_per_day,
-        "pause_between_emails": settings.pause_between_emails,
-        "reply_action": settings.reply_action,
-        "sending_time_start": str(settings.sending_time_start),  # orario in formato stringa
-        "sending_time_end": str(settings.sending_time_end),
-        "sending_days": settings.sending_days,
-        "unsubscribe_handling": settings.unsubscribe_handling,
-        "bounce_handling": settings.bounce_handling,
-    }
-
+from utils.utils import serialize_workflow_settings
 
 @receiver(post_save, sender=Lead)
 def process_new_lead(sender, instance, created, **kwargs):
@@ -41,19 +26,8 @@ def process_new_lead(sender, instance, created, **kwargs):
             settings_dict = serialize_workflow_settings(workflow_settings)
             # if workflow_settings and workflow_settings.start == "new":
             if workflow_settings:
-                # print(f"Workflow trovato: {workflow.id}")
-                # print(f"Settings: Max Emails per Day: {workflow_settings.max_emails_per_day}")
-                # print(f"Pause tra email: {workflow_settings.pause_between_emails} secondi")
-                # print(f"Gestione risposte: {workflow_settings.reply_action}")
-                # print(f"Orario di invio: {workflow_settings.sending_time_start} - {workflow_settings.sending_time_end}")
-                # print(f"Giorni di invio: {workflow_settings.sending_days}")
-                # print(f"Gestione Unsubscribe: {workflow_settings.unsubscribe_handling}")
-                # print(f"Gestione Bounce: {workflow_settings.bounce_handling}")
-
                 # Esegui il workflow in background sul lead aggiunto
                 execution = WorkflowExecution.objects.filter(workflow=workflow).first()
-                # print(f"Workflow Execution: {execution.id}")
-
                 execute_workflow.delay(execution.id, instance.id, settings_dict)
         else:
             print("⚠️ Nessun Workflow trovato per questa campagna.")

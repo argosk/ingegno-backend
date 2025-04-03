@@ -1,7 +1,9 @@
 import uuid
 from django.db import models
 from django.utils.timezone import now
+from datetime import timedelta
 from leads.models import Lead
+from connected_accounts.models import ConnectedAccount
 
 class EmailStatus(models.TextChoices):
     SENT = "sent", "Sent"
@@ -74,3 +76,26 @@ class EmailReplyTracking(models.Model):
 
     def __str__(self):
         return f"Reply from {self.lead.email} - {self.subject}"    
+
+
+class ThrottleStatus(models.Model):
+    account = models.OneToOneField(ConnectedAccount, on_delete=models.CASCADE)
+    consecutive_failures = models.IntegerField(default=0)
+    last_error_at = models.DateTimeField(null=True, blank=True)
+    paused_until = models.DateTimeField(null=True, blank=True)
+
+    def is_throttled(self):
+        return self.paused_until and now() < self.paused_until
+
+    def reset(self):
+        self.consecutive_failures = 0
+        self.paused_until = None
+        self.last_error_at = None
+        self.save()
+
+    def increase(self):
+        self.consecutive_failures += 1
+        self.last_error_at = now()
+        if self.consecutive_failures >= 3:
+            self.paused_until = now() + timedelta(minutes=10)
+        self.save()

@@ -2,6 +2,7 @@ import uuid
 from django.db import models
 from campaigns.models import Campaign
 from emails.models import EmailLog
+from leads.models import Lead
 from users.models import User
 
 
@@ -81,6 +82,7 @@ class WorkflowExecutionStepStatus(models.TextChoices):
     RUNNING = 'RUNNING'
     COMPLETED = 'COMPLETED'
     FAILED = 'FAILED'
+    SKIPPED = 'SKIPPED'
 
 
 class WorkflowExecutionStep(models.Model):
@@ -99,6 +101,20 @@ class WorkflowExecutionStep(models.Model):
 
     def __str__(self):
         return f"Step {self.number} - {self.name}"
+    
+class WorkflowQueue(models.Model):
+    lead = models.ForeignKey(Lead, on_delete=models.CASCADE)
+    workflow_execution = models.ForeignKey(WorkflowExecution, on_delete=models.CASCADE)
+    settings = models.JSONField()
+
+    processed = models.BooleanField(default=False)
+    processing = models.BooleanField(default=False)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    processed_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"Queue: {self.lead.email} - {self.workflow_execution.workflow.name}"    
 
 class LeadWorkflowStateStatus(models.TextChoices):
     RUNNING = 'RUNNING'
