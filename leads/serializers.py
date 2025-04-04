@@ -10,8 +10,6 @@ class LeadSerializer(serializers.ModelSerializer):
     class Meta:
         model = Lead
         fields = [
-            'id', 'campaign', 'name', 'email', 'phone', 'company', 
-            'status', 'status_display', 
-            'created_at', 'updated_at'
+            'id', 'campaign', 'first_name', 'last_name', 'email', 'phone', 'company', 'website', 'status', 'status_display', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
